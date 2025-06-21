@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
+import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { 
   PlayCircle, 
@@ -14,7 +15,10 @@ import {
   TrendingUp, 
   Award,
   Target,
-  Clock
+  Clock,
+  BarChart3,
+  BookOpen,
+  ClipboardList
 } from 'lucide-react';
 
 interface StudentData {
@@ -31,21 +35,26 @@ interface DashboardStats {
   recentQuizzes: any[];
   achievements: any[];
   availableQuizzes: any[];
+  assignedQuizzes: any[];
   classRank: number;
   totalClassmates: number;
 }
 
-export function StudentDashboard() {
+interface StudentDashboardProps {
+  onStartQuiz: (quizId: string) => void;
+}
+
+export function StudentDashboard({ onStartQuiz }: StudentDashboardProps) {
   const { profileId } = useAuth();
-  const [stats, setStats] = useState<DashboardStats>({
+  const { toast } = useToast();  const [stats, setStats] = useState<DashboardStats>({
     studentData: null,
     recentQuizzes: [],
     achievements: [],
     availableQuizzes: [],
+    assignedQuizzes: [],
     classRank: 0,
     totalClassmates: 0,
-  });
-  const [loading, setLoading] = useState(true);
+  });  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     if (profileId) {
@@ -73,9 +82,7 @@ export function StudentDashboard() {
         `)
         .eq('student_id', profileId)
         .order('completed_at', { ascending: false })
-        .limit(5);
-
-      // Fetch available quizzes
+        .limit(5);      // Fetch available quizzes
       const { data: availableQuizzes } = await supabase
         .from('class_quizzes')
         .select(`
@@ -85,6 +92,42 @@ export function StudentDashboard() {
         .eq('class_id', studentData?.class_id)
         .order('assigned_at', { ascending: false })
         .limit(3);
+
+      // Fetch assigned quizzes with completion status
+      const assignedQuizzesQuery = await supabase
+        .from('class_quizzes')
+        .select(`
+          id,
+          quiz_id,
+          assigned_at,
+          due_date,
+          quiz:quizzes!inner(
+            id,
+            title,
+            description,
+            difficulty,
+            time_limit
+          )
+        `)
+        .eq('class_id', studentData?.class_id)
+        .order('assigned_at', { ascending: false })
+        .limit(3);
+
+      const assignedQuizzes = assignedQuizzesQuery.data || [];
+
+      // Check completion status for assigned quizzes
+      const assignedQuizIds = assignedQuizzes.map(q => q.quiz_id);
+      const { data: completedQuizzes } = await supabase
+        .from('user_progress')
+        .select('quiz_id')
+        .eq('student_id', profileId)
+        .in('quiz_id', assignedQuizIds);
+
+      const completedQuizIds = completedQuizzes?.map(c => c.quiz_id) || [];
+      const enrichedAssignedQuizzes = assignedQuizzes.map(quiz => ({
+        ...quiz,
+        completed: completedQuizIds.includes(quiz.quiz_id)
+      }));
 
       // Fetch achievements
       const { data: achievements } = await supabase
@@ -106,21 +149,21 @@ export function StudentDashboard() {
           .order('total_points', { ascending: false });
 
         const rank = classmates?.findIndex(s => s.total_points <= studentData.total_points) + 1 || 0;
-        
-        setStats({
+          setStats({
           studentData,
           recentQuizzes: recentQuizzes || [],
           achievements: achievements || [],
           availableQuizzes: availableQuizzes || [],
+          assignedQuizzes: enrichedAssignedQuizzes || [],
           classRank: rank,
           totalClassmates: classmates?.length || 0,
         });
-      } else {
-        setStats({
+      } else {        setStats({
           studentData,
           recentQuizzes: recentQuizzes || [],
           achievements: achievements || [],
           availableQuizzes: availableQuizzes || [],
+          assignedQuizzes: [],
           classRank: 0,
           totalClassmates: 0,
         });
@@ -215,11 +258,100 @@ export function StudentDashboard() {
             />
           </div>
         </CardContent>
-      </Card>
-
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      </Card>      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Quick Actions */}
         <div className="lg:col-span-2 space-y-6">
+          {/* Assigned Quizzes */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <ClipboardList className="h-5 w-5 text-purple-600" />
+                Assigned Quizzes
+              </CardTitle>
+              <CardDescription>
+                Quizzes assigned by your teacher
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {stats.assignedQuizzes.length === 0 ? (
+                <div className="text-center py-6 text-gray-500">
+                  <ClipboardList className="h-8 w-8 mx-auto mb-3 text-gray-300" />
+                  <p>No assigned quizzes yet</p>
+                  <p className="text-sm">Your teacher will assign quizzes for you to complete</p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {stats.assignedQuizzes.map((assignment) => {
+                    const isOverdue = assignment.due_date && new Date(assignment.due_date) < new Date();
+                    const daysUntilDue = assignment.due_date 
+                      ? Math.ceil((new Date(assignment.due_date).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24))
+                      : null;
+                    
+                    return (
+                      <div
+                        key={assignment.id}
+                        className={`flex items-center justify-between p-4 border rounded-lg transition-colors ${
+                          assignment.completed 
+                            ? 'bg-green-50 border-green-200' 
+                            : isOverdue 
+                            ? 'bg-red-50 border-red-200'
+                            : 'hover:bg-gray-50'
+                        }`}
+                      >
+                        <div className="flex items-center gap-3">
+                          <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
+                            assignment.completed 
+                              ? 'bg-green-100' 
+                              : isOverdue 
+                              ? 'bg-red-100'
+                              : 'bg-purple-100'
+                          }`}>
+                            {assignment.completed ? (
+                              <Trophy className="h-5 w-5 text-green-600" />
+                            ) : (
+                              <ClipboardList className={`h-5 w-5 ${isOverdue ? 'text-red-600' : 'text-purple-600'}`} />
+                            )}
+                          </div>
+                          <div>
+                            <h3 className="font-medium">{assignment.quiz.title}</h3>
+                            <div className="flex items-center gap-2 text-sm text-gray-600">
+                              <Badge className={`text-xs ${
+                                assignment.completed 
+                                  ? 'bg-green-100 text-green-800' 
+                                  : isOverdue 
+                                  ? 'bg-red-100 text-red-800'
+                                  : 'bg-blue-100 text-blue-800'
+                              }`}>
+                                {assignment.completed ? 'Completed' : isOverdue ? 'Overdue' : 'Pending'}
+                              </Badge>
+                              <Badge variant="outline" className="text-xs">
+                                {assignment.quiz.difficulty}
+                              </Badge>
+                              {assignment.due_date && !assignment.completed && (
+                                <span className={`text-xs ${isOverdue ? 'text-red-600' : ''}`}>
+                                  {isOverdue 
+                                    ? `${Math.abs(daysUntilDue)} days overdue`
+                                    : daysUntilDue === 0 
+                                    ? 'Due today!'
+                                    : `${daysUntilDue} days left`
+                                  }
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        </div>                        <Button 
+                          size="sm"
+                          onClick={() => onStartQuiz(assignment.quiz_id)}
+                        >
+                          {assignment.completed ? "Review" : "Start"}
+                        </Button>
+                      </div>
+                    );                  })}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
           {/* Available Quizzes */}
           <Card>
             <CardHeader>
@@ -261,8 +393,10 @@ export function StudentDashboard() {
                             </span>
                           </div>
                         </div>
-                      </div>
-                      <Button size="sm">
+                      </div>                      <Button 
+                        size="sm"
+                        onClick={() => onStartQuiz(quiz.quiz_id)}
+                      >
                         Start Quiz
                       </Button>
                     </div>
@@ -338,8 +472,7 @@ export function StudentDashboard() {
                   <Flame className="h-4 w-4 text-orange-500" />
                   {studentData?.current_streak}
                 </span>
-              </div>
-              {studentData?.classes && (
+              </div>              {studentData?.classes && (
                 <div className="flex items-center justify-between">
                   <span className="text-sm text-gray-600">Class</span>
                   <Badge variant="secondary">{studentData.classes.name}</Badge>
@@ -380,8 +513,7 @@ export function StudentDashboard() {
                     </div>
                   ))}
                 </div>
-              )}
-            </CardContent>
+              )}            </CardContent>
           </Card>
         </div>
       </div>

@@ -11,7 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
-import { Plus, FileText, Clock, Award, Edit, Trash2, Sparkles, BookOpen, GraduationCap, MessageCircle, Timer, Zap, Star, Target } from 'lucide-react';
+import { Plus, FileText, Clock, Award, Edit, Trash2, Sparkles, BookOpen, GraduationCap, MessageCircle, Timer, Zap, Star, Target, Send } from 'lucide-react';
 import { QuestionManager } from './QuestionManager';
 
 interface Quiz {
@@ -606,9 +606,7 @@ export function QuizManagement() {
                     <span className="text-gray-500">
                       {new Date(quiz.created_at).toLocaleDateString()}
                     </span>
-                  </div>
-
-                  <div className="flex gap-2 pt-2">
+                  </div>                  <div className="flex gap-2 pt-2">
                     <Button
                       size="sm"
                       variant="outline"
@@ -618,6 +616,21 @@ export function QuizManagement() {
                       <FileText className="h-4 w-4 mr-1" />
                       Kelola Soal
                     </Button>
+                    {(quiz.questionCount || 0) > 0 && (
+                      <Button
+                        size="sm"
+                        variant="default"
+                        onClick={() => {
+                          toast({
+                            title: '🎯 Assignment Feature',
+                            description: 'Go to Assignment tab to assign this quiz to classes',
+                          });
+                        }}
+                        className="bg-green-600 hover:bg-green-700"
+                      >
+                        <Send className="h-4 w-4" />
+                      </Button>
+                    )}
                     <Button
                       size="sm"
                       variant="outline"

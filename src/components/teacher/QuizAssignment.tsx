@@ -1,0 +1,400 @@
+import { useState, useEffect } from 'react';
+import { useAuth } from '@/hooks/useAuth';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Badge } from '@/components/ui/badge';
+import { Checkbox } from '@/components/ui/checkbox';
+import { useToast } from '@/hooks/use-toast';
+import { supabase } from '@/integrations/supabase/client';
+import { Send, Users, Clock, Award, Target, CheckCircle, AlertCircle, XCircle } from 'lucide-react';
+
+interface Quiz {
+  id: string;
+  title: string;
+  description: string;
+  difficulty: 'easy' | 'medium' | 'hard';
+  time_limit: number;
+  points_per_question: number;
+  questionCount?: number;
+}
+
+interface Class {
+  id: string;
+  name: string;
+  student_count?: number;
+}
+
+interface Assignment {
+  id: string;
+  quiz_id: string;
+  class_id: string;
+  assigned_at: string;
+  due_date?: string;
+  quiz: Quiz;
+  class: Class;
+}
+
+export function QuizAssignment() {
+  const { profileId } = useAuth();
+  const { toast } = useToast();
+  const [quizzes, setQuizzes] = useState<Quiz[]>([]);
+  const [classes, setClasses] = useState<Class[]>([]);
+  const [assignments, setAssignments] = useState<Assignment[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [isAssignDialogOpen, setIsAssignDialogOpen] = useState(false);
+  const [selectedQuiz, setSelectedQuiz] = useState<Quiz | null>(null);
+  const [selectedClasses, setSelectedClasses] = useState<string[]>([]);
+  const [dueDays, setDueDays] = useState<string>('7');
+
+  useEffect(() => {
+    if (profileId) {
+      fetchData();
+    }
+  }, [profileId]);
+
+  const fetchData = async () => {
+    try {
+      setLoading(true);
+      await Promise.all([fetchQuizzes(), fetchClasses(), fetchAssignments()]);
+    } catch (error) {
+      console.error('Error fetching data:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchQuizzes = async () => {
+    const { data, error } = await supabase
+      .from('quizzes')
+      .select('*')
+      .eq('created_by', profileId);
+
+    if (error) throw error;
+
+    // Get question counts
+    const quizzesWithCounts = await Promise.all(
+      (data || []).map(async (quiz) => {
+        const { count } = await supabase
+          .from('questions')
+          .select('*', { count: 'exact' })
+          .eq('quiz_id', quiz.id);
+        
+        return { ...quiz, questionCount: count || 0 };
+      })
+    );
+
+    setQuizzes(quizzesWithCounts);
+  };
+
+  const fetchClasses = async () => {
+    const { data, error } = await supabase
+      .from('classes')
+      .select(`
+        id,
+        name,
+        students:students(count)
+      `)
+      .eq('teacher_id', profileId);
+
+    if (error) throw error;
+
+    const classesWithCounts = (data || []).map(cls => ({
+      ...cls,
+      student_count: cls.students?.[0]?.count || 0
+    }));
+
+    setClasses(classesWithCounts);
+  };
+
+  const fetchAssignments = async () => {
+    const { data, error } = await supabase
+      .from('class_quizzes')
+      .select(`
+        *,
+        quiz:quizzes(*),
+        class:classes(*)
+      `)
+      .eq('quiz.created_by', profileId);
+
+    if (error) throw error;
+    setAssignments(data || []);
+  };
+
+  const handleAssignQuiz = async () => {
+    if (!selectedQuiz || selectedClasses.length === 0) {
+      toast({
+        title: 'Error',
+        description: 'Please select a quiz and at least one class',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    try {
+      const dueDate = new Date();
+      dueDate.setDate(dueDate.getDate() + parseInt(dueDays));      const assignments = selectedClasses.map(classId => ({
+        quiz_id: selectedQuiz.id,
+        class_id: classId,
+        due_date: dueDate.toISOString(),
+        assigned_at: new Date().toISOString(),
+      }));
+
+      const { error } = await supabase
+        .from('class_quizzes')
+        .insert(assignments);
+
+      if (error) throw error;
+
+      toast({
+        title: '🎯 Quiz Assigned Successfully!',
+        description: `"${selectedQuiz.title}" has been assigned to ${selectedClasses.length} class(es)`,
+      });
+
+      setIsAssignDialogOpen(false);
+      setSelectedQuiz(null);
+      setSelectedClasses([]);
+      fetchAssignments();
+    } catch (error: any) {
+      console.error('Assignment error:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to assign quiz',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const getDifficultyColor = (difficulty: string) => {
+    switch (difficulty) {
+      case 'easy': return 'bg-green-100 text-green-800 border-green-200';
+      case 'medium': return 'bg-yellow-100 text-yellow-800 border-yellow-200';
+      case 'hard': return 'bg-red-100 text-red-800 border-red-200';
+      default: return 'bg-gray-100 text-gray-800 border-gray-200';
+    }
+  };
+  const getAssignmentStatus = (assignment: Assignment): 'active' | 'expired' | 'completed' => {
+    if (!assignment.due_date) return 'active';
+    const dueDate = new Date(assignment.due_date);
+    const now = new Date();
+    
+    if (now > dueDate) return 'expired';
+    return 'active';
+  };
+
+  const getStatusColor = (assignment: Assignment) => {
+    const status = getAssignmentStatus(assignment);
+    switch (status) {
+      case 'active': return 'bg-blue-100 text-blue-800 border-blue-200';
+      case 'completed': return 'bg-green-100 text-green-800 border-green-200';
+      case 'expired': return 'bg-red-100 text-red-800 border-red-200';
+      default: return 'bg-gray-100 text-gray-800 border-gray-200';
+    }
+  };
+
+  const formatTime = (seconds: number) => {
+    const minutes = Math.floor(seconds / 60);
+    return `${minutes}m`;
+  };
+
+  if (loading) {
+    return (
+      <div className="text-center py-8">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
+        <p className="mt-2 text-gray-600">Loading quiz assignments...</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      <div className="flex justify-between items-center">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">Quiz Assignment</h1>
+          <p className="text-gray-600">Assign quizzes to your classes</p>
+        </div>
+        
+        <Dialog open={isAssignDialogOpen} onOpenChange={setIsAssignDialogOpen}>
+          <DialogTrigger asChild>
+            <Button className="flex items-center gap-2">
+              <Send className="h-4 w-4" />
+              Assign Quiz
+            </Button>
+          </DialogTrigger>
+          <DialogContent className="max-w-2xl">
+            <DialogHeader>
+              <DialogTitle>Assign Quiz to Classes</DialogTitle>
+            </DialogHeader>
+            
+            <div className="space-y-6">
+              {/* Select Quiz */}
+              <div>
+                <label className="text-sm font-medium">Select Quiz</label>
+                <Select
+                  value={selectedQuiz?.id || ''}
+                  onValueChange={(value) => {
+                    const quiz = quizzes.find(q => q.id === value);
+                    setSelectedQuiz(quiz || null);
+                  }}
+                >
+                  <SelectTrigger className="mt-2">
+                    <SelectValue placeholder="Choose a quiz to assign" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {quizzes.filter(q => q.questionCount > 0).map((quiz) => (
+                      <SelectItem key={quiz.id} value={quiz.id}>
+                        <div className="flex items-center justify-between w-full">
+                          <span>{quiz.title}</span>
+                          <div className="flex items-center gap-2 ml-4">
+                            <Badge className={getDifficultyColor(quiz.difficulty)}>
+                              {quiz.difficulty}
+                            </Badge>
+                            <span className="text-xs text-gray-500">
+                              {quiz.questionCount} questions
+                            </span>
+                          </div>
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Select Classes */}
+              <div>
+                <label className="text-sm font-medium">Select Classes</label>
+                <div className="mt-2 space-y-2 max-h-40 overflow-y-auto">
+                  {classes.map((cls) => (
+                    <div key={cls.id} className="flex items-center space-x-2">
+                      <Checkbox
+                        id={cls.id}
+                        checked={selectedClasses.includes(cls.id)}
+                        onCheckedChange={(checked) => {
+                          if (checked) {
+                            setSelectedClasses([...selectedClasses, cls.id]);
+                          } else {
+                            setSelectedClasses(selectedClasses.filter(id => id !== cls.id));
+                          }
+                        }}
+                      />
+                      <label htmlFor={cls.id} className="flex-1 cursor-pointer">
+                        <div className="flex items-center justify-between">
+                          <span>{cls.name}</span>
+                          <span className="text-xs text-gray-500">
+                            {cls.student_count} students
+                          </span>
+                        </div>
+                      </label>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Due Date */}
+              <div>
+                <label className="text-sm font-medium">Due Date</label>
+                <Select value={dueDays} onValueChange={setDueDays}>
+                  <SelectTrigger className="mt-2">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="1">1 day from now</SelectItem>
+                    <SelectItem value="3">3 days from now</SelectItem>
+                    <SelectItem value="7">1 week from now</SelectItem>
+                    <SelectItem value="14">2 weeks from now</SelectItem>
+                    <SelectItem value="30">1 month from now</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="flex justify-end gap-2">
+                <Button variant="outline" onClick={() => setIsAssignDialogOpen(false)}>
+                  Cancel
+                </Button>
+                <Button onClick={handleAssignQuiz}>
+                  Assign Quiz
+                </Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+      </div>
+
+      {/* Current Assignments */}
+      <div>
+        <h2 className="text-lg font-semibold mb-4">Current Assignments</h2>
+        {assignments.length === 0 ? (
+          <Card className="p-8 text-center">
+            <Target className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+            <h3 className="text-lg font-medium text-gray-900 mb-2">No assignments yet</h3>
+            <p className="text-gray-600 mb-4">Start by assigning your first quiz to a class!</p>
+            <Button onClick={() => setIsAssignDialogOpen(true)}>
+              <Send className="h-4 w-4 mr-2" />
+              Assign Quiz
+            </Button>
+          </Card>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {assignments.map((assignment) => (
+              <Card key={assignment.id} className="hover:shadow-lg transition-shadow">
+                <CardHeader>
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1">
+                      <CardTitle className="text-lg">{assignment.quiz.title}</CardTitle>
+                      <CardDescription className="mt-1">
+                        Assigned to: {assignment.class.name}
+                      </CardDescription>
+                    </div>                    <Badge className={getStatusColor(assignment)}>
+                      {getAssignmentStatus(assignment) === 'active' && <AlertCircle className="h-3 w-3 mr-1" />}
+                      {getAssignmentStatus(assignment) === 'completed' && <CheckCircle className="h-3 w-3 mr-1" />}
+                      {getAssignmentStatus(assignment) === 'expired' && <XCircle className="h-3 w-3 mr-1" />}
+                      {getAssignmentStatus(assignment)}
+                    </Badge>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between text-sm">
+                      <Badge className={getDifficultyColor(assignment.quiz.difficulty)}>
+                        {assignment.quiz.difficulty}
+                      </Badge>
+                      <div className="flex items-center gap-3 text-gray-600">
+                        <div className="flex items-center gap-1">
+                          <Clock className="h-4 w-4" />
+                          <span>{formatTime(assignment.quiz.time_limit)}</span>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <Award className="h-4 w-4" />
+                          <span>{assignment.quiz.points_per_question}pts</span>
+                        </div>
+                      </div>
+                    </div>
+                    
+                    <div className="text-sm text-gray-600">
+                      <div className="flex justify-between">
+                        <span>Assigned:</span>
+                        <span>{new Date(assignment.assigned_at).toLocaleDateString()}</span>
+                      </div>
+                      {assignment.due_date && (
+                        <div className="flex justify-between">
+                          <span>Due:</span>
+                          <span>{new Date(assignment.due_date).toLocaleDateString()}</span>
+                        </div>
+                      )}
+                    </div>
+                    
+                    <div className="flex items-center gap-1 text-sm text-gray-600">
+                      <Users className="h-4 w-4" />
+                      <span>{assignment.class.student_count || 0} students</span>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}

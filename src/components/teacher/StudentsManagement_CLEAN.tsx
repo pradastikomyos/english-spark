@@ -38,8 +38,6 @@ export function StudentsManagement() {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
-  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
-  const [editingStudent, setEditingStudent] = useState<Student | null>(null);
   const [formData, setFormData] = useState({
     name: '',
     studentId: '',
@@ -174,148 +172,13 @@ export function StudentsManagement() {
     return name.toLowerCase().replace(/\s+/g, '.') + '@gmail.com';
   };
 
-  const resetForm = () => {
-    setFormData({ name: '', studentId: '', classId: '', password: '' });
-    setEditingStudent(null);
-  };  const handleAddStudent = async (e: React.FormEvent) => {
+  const handleAddStudent = async (e: React.FormEvent) => {
     e.preventDefault();
     
     try {
       const email = generateEmail(formData.name);
       
-      // Auto-generate student ID if not provided
-      let studentId = formData.studentId;
-      if (!studentId) {
-        studentId = `STD${Date.now()}`;
-      }
-      
-      console.log('➕ Creating COMPLETE student with auth user:', { 
-        name: formData.name, 
-        email, 
-        studentId,
-        classId: formData.classId 
-      });
-      
-      // Validate required fields
-      if (!formData.name) {
-        throw new Error('Name is required');
-      }
-      
-      // Check if student ID already exists
-      const { data: existingStudent } = await supabase
-        .from('students')
-        .select('student_id')
-        .eq('student_id', studentId)
-        .single();
-        if (existingStudent) {
-        // Generate new unique ID
-        studentId = `STD${Date.now()}_${Math.random().toString(36).substr(2, 5)}`;
-      }
-
-      // STEP 1: Create AUTH USER via signup
-      const defaultPassword = formData.password || '123456'; // Default password
-      console.log('🔑 Creating auth user for:', email);
-      
-      const { data: authData, error: authError } = await supabase.auth.signUp({
-        email: email,
-        password: defaultPassword,
-        options: {
-          emailRedirectTo: undefined, // Skip email confirmation
-        }
-      });
-
-      if (authError) {
-        console.error('❌ Auth creation error:', authError);
-        throw new Error(`Failed to create auth user: ${authError.message}`);
-      }
-
-      if (!authData.user) {
-        throw new Error('Failed to create user - no user data returned');
-      }
-
-      console.log('✅ Auth user created:', authData.user.id);
-
-      // STEP 2: Create student profile
-      const { data: student, error: studentError } = await supabase
-        .from('students')
-        .insert({
-          id: authData.user.id, // Use auth user ID as student ID
-          user_id: authData.user.id,
-          name: formData.name,
-          email,
-          student_id: studentId,
-          class_id: formData.classId || null,
-          total_points: 0,
-          level: 1,
-          current_streak: 0
-        })
-        .select()
-        .single();
-
-      if (studentError) {
-        console.error('❌ Student creation error:', studentError);
-        throw new Error(`Failed to create student profile: ${studentError.message}`);
-      }
-
-      console.log('✅ Student profile created:', student);
-
-      // STEP 3: Create user role link
-      const { error: roleError } = await supabase
-        .from('user_roles')
-        .insert({
-          user_id: authData.user.id,
-          role: 'student',
-          profile_id: authData.user.id
-        });
-
-      if (roleError) {
-        console.warn('⚠️ Failed to create user role (non-critical):', roleError);
-      } else {
-        console.log('✅ User role created');
-      }
-
-      console.log('✅ COMPLETE student creation successful!');
-
-      toast({
-        title: '🎉 Student Created Successfully!',
-        description: `${formData.name} can now login with email: ${email} and password: ${defaultPassword}`,
-      });
-
-      setIsAddDialogOpen(false);
-      resetForm();
-      await fetchStudents();
-    } catch (error: any) {
-      console.error('❌ Add student error:', error);
-      toast({
-        title: 'Error',
-        description: error.message || 'Failed to add student',
-        variant: 'destructive',
-      });
-    }
-  };
-
-  const handleEditStudent = (student: Student) => {
-    console.log('📝 Editing student:', student);
-    setEditingStudent(student);
-    setFormData({
-      name: student.name,
-      studentId: student.student_id,
-      classId: student.class_id || '',
-      password: '', // Don't pre-fill password for security
-    });
-    setIsEditDialogOpen(true);
-  };
-
-  const handleUpdateStudent = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    if (!editingStudent) return;
-    
-    try {
-      const email = generateEmail(formData.name);
-      
-      console.log('🔄 Updating student:', { 
-        id: editingStudent.id,
+      console.log('➕ Creating student with data:', { 
         name: formData.name, 
         email, 
         studentId: formData.studentId,
@@ -327,73 +190,41 @@ export function StudentsManagement() {
         throw new Error('Name and Student ID are required');
       }
       
-      // Update student data
+      // For now, create student without auth user (simplified approach)
       const { data: student, error: studentError } = await supabase
         .from('students')
-        .update({
+        .insert({
           name: formData.name,
           email,
           student_id: formData.studentId,
           class_id: formData.classId || null,
+          total_points: 0,
+          level: 1,
+          current_streak: 0
         })
-        .eq('id', editingStudent.id)
         .select()
         .single();
 
-      console.log('✅ Student update result:', { student, error: studentError });
+      console.log('✅ Student creation result:', { student, error: studentError });
 
       if (studentError) {
-        console.error('❌ Student update error:', studentError);
-        throw new Error(`Failed to update student: ${studentError.message}`);
+        console.error('❌ Student creation error:', studentError);
+        throw new Error(`Failed to create student: ${studentError.message}`);
       }
 
       toast({
         title: 'Success',
-        description: `Student ${formData.name} updated successfully!`,
+        description: `Student ${formData.name} added successfully!`,
       });
 
-      setIsEditDialogOpen(false);
-      resetForm();
-      await fetchStudents();
+      setIsAddDialogOpen(false);
+      setFormData({ name: '', studentId: '', classId: '', password: '' });
+      await fetchStudents(); // Wait for refresh
     } catch (error: any) {
-      console.error('❌ Update student error:', error);
+      console.error('❌ Add student error:', error);
       toast({
         title: 'Error',
-        description: error.message || 'Failed to update student',
-        variant: 'destructive',
-      });
-    }
-  };
-
-  const handleDeleteStudent = async (student: Student) => {
-    if (!confirm(`Are you sure you want to delete student "${student.name}"? This action cannot be undone.`)) {
-      return;
-    }
-    
-    try {
-      console.log('🗑️ Deleting student:', student);
-      
-      const { error } = await supabase
-        .from('students')
-        .delete()
-        .eq('id', student.id);
-
-      if (error) {
-        console.error('❌ Delete error:', error);
-        throw new Error(`Failed to delete student: ${error.message}`);
-      }
-
-      toast({
-        title: 'Success',
-        description: `Student ${student.name} deleted successfully!`,
-      });
-
-      await fetchStudents();
-    } catch (error: any) {
-      console.error('❌ Delete student error:', error);
-      toast({
-        title: 'Error',
-        description: error.message || 'Failed to delete student',
+        description: error.message || 'Failed to add student',
         variant: 'destructive',
       });
     }
@@ -461,15 +292,16 @@ export function StudentsManagement() {
                     placeholder="Enter student's full name"
                     required
                   />
-                </div>                <div className="space-y-2">
-                  <Label htmlFor="studentId">Student ID (Optional)</Label>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="studentId">Student ID</Label>
                   <Input
                     id="studentId"
                     value={formData.studentId}
                     onChange={(e) => setFormData({ ...formData, studentId: e.target.value })}
-                    placeholder="Auto-generated if empty"
+                    placeholder="Enter student ID"
+                    required
                   />
-                  <p className="text-xs text-gray-500">Leave empty to auto-generate unique ID</p>
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="class">Class</Label>
@@ -485,16 +317,17 @@ export function StudentsManagement() {
                       ))}
                     </SelectContent>
                   </Select>
-                </div>                <div className="space-y-2">
+                </div>
+                <div className="space-y-2">
                   <Label htmlFor="password">Password</Label>
                   <Input
                     id="password"
                     type="password"
                     value={formData.password}
                     onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                    placeholder="Default: 123456"
+                    placeholder="Enter password"
+                    required
                   />
-                  <p className="text-xs text-gray-500">Leave empty to use default password: 123456</p>
                 </div>
                 {formData.name && (
                   <div className="text-sm text-gray-600">
@@ -509,86 +342,6 @@ export function StudentsManagement() {
           </Dialog>
         </div>
       </div>
-
-      {/* Edit Student Dialog */}
-      <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Edit className="h-4 w-4" />
-              Edit Student
-            </DialogTitle>
-          </DialogHeader>
-          <form onSubmit={handleUpdateStudent} className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="edit-name">Full Name</Label>
-              <Input
-                id="edit-name"
-                value={formData.name}
-                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                placeholder="Enter student's full name"
-                required
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="edit-studentId">Student ID</Label>
-              <Input
-                id="edit-studentId"
-                value={formData.studentId}
-                onChange={(e) => setFormData({ ...formData, studentId: e.target.value })}
-                placeholder="Enter student ID"
-                required
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="edit-class">Class</Label>
-              <Select value={formData.classId} onValueChange={(value) => setFormData({ ...formData, classId: value })}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select a class" />
-                </SelectTrigger>
-                <SelectContent>
-                  {classes.map((classItem) => (
-                    <SelectItem key={classItem.id} value={classItem.id}>
-                      {classItem.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="edit-password">New Password (optional)</Label>
-              <Input
-                id="edit-password"
-                type="password"
-                value={formData.password}
-                onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                placeholder="Leave empty to keep current password"
-              />
-            </div>
-            {formData.name && (
-              <div className="text-sm text-gray-600">
-                Email will be: {generateEmail(formData.name)}
-              </div>
-            )}
-            <div className="flex gap-2">
-              <Button 
-                type="button" 
-                variant="outline" 
-                className="flex-1"
-                onClick={() => {
-                  setIsEditDialogOpen(false);
-                  resetForm();
-                }}
-              >
-                Cancel
-              </Button>
-              <Button type="submit" className="flex-1">
-                Update Student
-              </Button>
-            </div>
-          </form>
-        </DialogContent>
-      </Dialog>
 
       <Card>
         <CardHeader>
@@ -664,21 +417,10 @@ export function StudentsManagement() {
                       </TableCell>
                       <TableCell>
                         <div className="flex items-center gap-2">
-                          <Button 
-                            variant="ghost" 
-                            size="sm" 
-                            onClick={() => handleEditStudent(student)}
-                            title="Edit Student"
-                          >
+                          <Button variant="ghost" size="sm">
                             <Edit className="h-4 w-4" />
                           </Button>
-                          <Button 
-                            variant="ghost" 
-                            size="sm" 
-                            className="text-red-600 hover:text-red-700" 
-                            onClick={() => handleDeleteStudent(student)}
-                            title="Delete Student"
-                          >
+                          <Button variant="ghost" size="sm" className="text-red-600">
                             <Trash2 className="h-4 w-4" />
                           </Button>
                         </div>

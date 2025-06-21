@@ -4,13 +4,14 @@ import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
 import { 
   Home, 
-  PlayCircle, 
-  Trophy, 
+  ClipboardList, 
+  BarChart3, 
   Award, 
   User, 
   LogOut,
   Menu,
-  X
+  X,
+  BookOpen
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -23,11 +24,10 @@ interface StudentLayoutProps {
 export function StudentLayout({ children, currentPage, onPageChange }: StudentLayoutProps) {
   const { signOut } = useAuth();
   const [sidebarOpen, setSidebarOpen] = useState(false);
-
   const navigation = [
     { name: 'Dashboard', id: 'dashboard', icon: Home },
-    { name: 'Take Quiz', id: 'quiz', icon: PlayCircle },
-    { name: 'Leaderboard', id: 'leaderboard', icon: Trophy },
+    { name: 'Assigned Quizzes', id: 'assigned', icon: ClipboardList },
+    { name: 'Quiz Results', id: 'results', icon: BarChart3 },
     { name: 'Achievements', id: 'achievements', icon: Award },
     { name: 'Profile', id: 'profile', icon: User },
   ];

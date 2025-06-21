@@ -10,7 +10,8 @@ import {
   Settings, 
   LogOut,
   Menu,
-  X
+  X,
+  Send
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -23,11 +24,11 @@ interface TeacherLayoutProps {
 export function TeacherLayout({ children, currentPage, onPageChange }: TeacherLayoutProps) {
   const { signOut } = useAuth();
   const [sidebarOpen, setSidebarOpen] = useState(false);
-
   const navigation = [
     { name: 'Dashboard', id: 'dashboard', icon: LayoutDashboard },
     { name: 'Students', id: 'students', icon: Users },
     { name: 'Quizzes', id: 'quizzes', icon: FileText },
+    { name: 'Assignment', id: 'assignment', icon: Send },
     { name: 'Reports', id: 'reports', icon: BarChart3 },
     { name: 'Settings', id: 'settings', icon: Settings },
   ];

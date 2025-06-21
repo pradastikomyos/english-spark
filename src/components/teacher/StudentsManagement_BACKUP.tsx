@@ -177,73 +177,33 @@ export function StudentsManagement() {
   const resetForm = () => {
     setFormData({ name: '', studentId: '', classId: '', password: '' });
     setEditingStudent(null);
-  };  const handleAddStudent = async (e: React.FormEvent) => {
+  };
+
+  const handleAddStudent = async (e: React.FormEvent) => {
     e.preventDefault();
     
     try {
       const email = generateEmail(formData.name);
       
-      // Auto-generate student ID if not provided
-      let studentId = formData.studentId;
-      if (!studentId) {
-        studentId = `STD${Date.now()}`;
-      }
-      
-      console.log('➕ Creating COMPLETE student with auth user:', { 
+      console.log('➕ Creating student with data:', { 
         name: formData.name, 
         email, 
-        studentId,
+        studentId: formData.studentId,
         classId: formData.classId 
       });
       
       // Validate required fields
-      if (!formData.name) {
-        throw new Error('Name is required');
+      if (!formData.name || !formData.studentId) {
+        throw new Error('Name and Student ID are required');
       }
       
-      // Check if student ID already exists
-      const { data: existingStudent } = await supabase
-        .from('students')
-        .select('student_id')
-        .eq('student_id', studentId)
-        .single();
-        if (existingStudent) {
-        // Generate new unique ID
-        studentId = `STD${Date.now()}_${Math.random().toString(36).substr(2, 5)}`;
-      }
-
-      // STEP 1: Create AUTH USER via signup
-      const defaultPassword = formData.password || '123456'; // Default password
-      console.log('🔑 Creating auth user for:', email);
-      
-      const { data: authData, error: authError } = await supabase.auth.signUp({
-        email: email,
-        password: defaultPassword,
-        options: {
-          emailRedirectTo: undefined, // Skip email confirmation
-        }
-      });
-
-      if (authError) {
-        console.error('❌ Auth creation error:', authError);
-        throw new Error(`Failed to create auth user: ${authError.message}`);
-      }
-
-      if (!authData.user) {
-        throw new Error('Failed to create user - no user data returned');
-      }
-
-      console.log('✅ Auth user created:', authData.user.id);
-
-      // STEP 2: Create student profile
+      // For now, create student without auth user (simplified approach)
       const { data: student, error: studentError } = await supabase
         .from('students')
         .insert({
-          id: authData.user.id, // Use auth user ID as student ID
-          user_id: authData.user.id,
           name: formData.name,
           email,
-          student_id: studentId,
+          student_id: formData.studentId,
           class_id: formData.classId || null,
           total_points: 0,
           level: 1,
@@ -252,33 +212,16 @@ export function StudentsManagement() {
         .select()
         .single();
 
+      console.log('✅ Student creation result:', { student, error: studentError });
+
       if (studentError) {
         console.error('❌ Student creation error:', studentError);
-        throw new Error(`Failed to create student profile: ${studentError.message}`);
+        throw new Error(`Failed to create student: ${studentError.message}`);
       }
-
-      console.log('✅ Student profile created:', student);
-
-      // STEP 3: Create user role link
-      const { error: roleError } = await supabase
-        .from('user_roles')
-        .insert({
-          user_id: authData.user.id,
-          role: 'student',
-          profile_id: authData.user.id
-        });
-
-      if (roleError) {
-        console.warn('⚠️ Failed to create user role (non-critical):', roleError);
-      } else {
-        console.log('✅ User role created');
-      }
-
-      console.log('✅ COMPLETE student creation successful!');
 
       toast({
-        title: '🎉 Student Created Successfully!',
-        description: `${formData.name} can now login with email: ${email} and password: ${defaultPassword}`,
+        title: 'Success',
+        description: `Student ${formData.name} added successfully!`,
       });
 
       setIsAddDialogOpen(false);
@@ -461,15 +404,16 @@ export function StudentsManagement() {
                     placeholder="Enter student's full name"
                     required
                   />
-                </div>                <div className="space-y-2">
-                  <Label htmlFor="studentId">Student ID (Optional)</Label>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="studentId">Student ID</Label>
                   <Input
                     id="studentId"
                     value={formData.studentId}
                     onChange={(e) => setFormData({ ...formData, studentId: e.target.value })}
-                    placeholder="Auto-generated if empty"
+                    placeholder="Enter student ID"
+                    required
                   />
-                  <p className="text-xs text-gray-500">Leave empty to auto-generate unique ID</p>
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="class">Class</Label>
@@ -485,16 +429,17 @@ export function StudentsManagement() {
                       ))}
                     </SelectContent>
                   </Select>
-                </div>                <div className="space-y-2">
+                </div>
+                <div className="space-y-2">
                   <Label htmlFor="password">Password</Label>
                   <Input
                     id="password"
                     type="password"
                     value={formData.password}
                     onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                    placeholder="Default: 123456"
+                    placeholder="Enter password"
+                    required
                   />
-                  <p className="text-xs text-gray-500">Leave empty to use default password: 123456</p>
                 </div>
                 {formData.name && (
                   <div className="text-sm text-gray-600">
