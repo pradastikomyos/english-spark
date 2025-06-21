@@ -210,11 +210,9 @@ export function StudentsManagement() {
         if (existingStudent) {
         // Generate new unique ID
         studentId = `STD${Date.now()}_${Math.random().toString(36).substr(2, 5)}`;
-      }
-
-      // STEP 1: Create AUTH USER via signup
-      const defaultPassword = formData.password || '123456'; // Default password
-      console.log('🔑 Creating auth user for:', email);
+      }      // STEP 1: Create AUTH USER via signup
+      const defaultPassword = formData.password || 'student123'; // Standard default password
+      console.log('🔑 Creating auth user for:', email, 'with password: student123');
       
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email: email,
