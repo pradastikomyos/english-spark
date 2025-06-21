@@ -39,6 +39,7 @@ export function StudentsManagement() {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
     studentId: '',
@@ -75,13 +76,27 @@ export function StudentsManagement() {
   const fetchStudents = async () => {
     try {
       setLoading(true);
+      
+      // First get all class IDs for this teacher
+      const { data: teacherClasses } = await supabase
+        .from('classes')
+        .select('id')
+        .eq('teacher_id', profileId);
+      
+      if (!teacherClasses || teacherClasses.length === 0) {
+        setStudents([]);
+        return;
+      }
+      
+      const classIds = teacherClasses.map(c => c.id);
+      
       const { data, error } = await supabase
         .from('students')
         .select(`
           *,
           classes:class_id(name)
         `)
-        .in('class_id', classes.map(c => c.id))
+        .in('class_id', classIds)
         .order('name');
 
       if (error) throw error;
@@ -104,17 +119,41 @@ export function StudentsManagement() {
   const handleAddStudent = async (e: React.FormEvent) => {
     e.preventDefault();
     
+    if (isSubmitting) return;
+    
     try {
+      setIsSubmitting(true);
       const email = generateEmail(formData.name);
       
-      // Create auth user first
-      const { data: authData, error: authError } = await supabase.auth.admin.createUser({
+      // Create auth user using regular signup
+      const { data: authData, error: authError } = await supabase.auth.signUp({
         email,
         password: formData.password,
-        email_confirm: true,
+        options: {
+          emailRedirectTo: `${window.location.origin}/`,
+          data: {
+            name: formData.name,
+            role: 'student'
+          }
+        },
       });
 
-      if (authError) throw authError;
+      if (authError) {
+        // If user already exists, try to get the existing user
+        if (authError.message.includes('already registered')) {
+          toast({
+            title: 'Error',
+            description: 'A user with this email already exists. Please use a different name.',
+            variant: 'destructive',
+          });
+          return;
+        }
+        throw authError;
+      }
+
+      if (!authData.user) {
+        throw new Error('Failed to create user account');
+      }
 
       // Create student profile
       const { data: student, error: studentError } = await supabase
@@ -132,26 +171,33 @@ export function StudentsManagement() {
       if (studentError) throw studentError;
 
       // Create user role
-      await supabase.from('user_roles').insert({
-        user_id: authData.user.id,
-        role: 'student',
-        profile_id: student.id,
-      });
+      const { error: roleError } = await supabase
+        .from('user_roles')
+        .insert({
+          user_id: authData.user.id,
+          role: 'student',
+          profile_id: student.id,
+        });
+
+      if (roleError) throw roleError;
 
       toast({
         title: 'Success',
-        description: 'Student added successfully',
+        description: `Student ${formData.name} added successfully! Login email: ${email}`,
       });
 
       setIsAddDialogOpen(false);
       setFormData({ name: '', studentId: '', classId: '', password: '' });
       fetchStudents();
     } catch (error: any) {
+      console.error('Error adding student:', error);
       toast({
         title: 'Error',
         description: error.message || 'Failed to add student',
         variant: 'destructive',
       });
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -226,17 +272,19 @@ export function StudentsManagement() {
                   type="password"
                   value={formData.password}
                   onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                  placeholder="Enter password"
+                  placeholder="Enter password (default: student123)"
                   required
                 />
               </div>
               {formData.name && (
-                <div className="text-sm text-gray-600">
-                  Email will be: {generateEmail(formData.name)}
+                <div className="text-sm text-gray-600 p-3 bg-blue-50 rounded-lg">
+                  <strong>Login Details:</strong><br />
+                  Email: {generateEmail(formData.name)}<br />
+                  Password: {formData.password || 'student123'}
                 </div>
               )}
-              <Button type="submit" className="w-full">
-                Add Student
+              <Button type="submit" className="w-full" disabled={isSubmitting}>
+                {isSubmitting ? 'Adding Student...' : 'Add Student'}
               </Button>
             </form>
           </DialogContent>
@@ -290,7 +338,7 @@ export function StudentsManagement() {
                 ) : filteredStudents.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={8} className="text-center py-8 text-gray-500">
-                      No students found
+                      {students.length === 0 ? 'No students found. Add some students to get started!' : 'No students match your search.'}
                     </TableCell>
                   </TableRow>
                 ) : (

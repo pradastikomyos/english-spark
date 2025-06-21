@@ -97,15 +97,7 @@ export type Database = {
           name?: string
           teacher_id?: string | null
         }
-        Relationships: [
-          {
-            foreignKeyName: "classes_teacher_id_fkey"
-            columns: ["teacher_id"]
-            isOneToOne: false
-            referencedRelation: "teachers"
-            referencedColumns: ["id"]
-          },
-        ]
+        Relationships: []
       }
       questions: {
         Row: {
@@ -188,15 +180,7 @@ export type Database = {
           title?: string
           updated_at?: string | null
         }
-        Relationships: [
-          {
-            foreignKeyName: "quizzes_created_by_fkey"
-            columns: ["created_by"]
-            isOneToOne: false
-            referencedRelation: "teachers"
-            referencedColumns: ["id"]
-          },
-        ]
+        Relationships: []
       }
       students: {
         Row: {
@@ -256,28 +240,25 @@ export type Database = {
       }
       teachers: {
         Row: {
-          avatar_url: string | null
           created_at: string | null
           email: string
           id: string
           name: string
-          updated_at: string | null
+          user_id: string | null
         }
         Insert: {
-          avatar_url?: string | null
           created_at?: string | null
           email: string
           id?: string
           name: string
-          updated_at?: string | null
+          user_id?: string | null
         }
         Update: {
-          avatar_url?: string | null
           created_at?: string | null
           email?: string
           id?: string
           name?: string
-          updated_at?: string | null
+          user_id?: string | null
         }
         Relationships: []
       }
@@ -367,21 +348,21 @@ export type Database = {
           created_at: string | null
           id: string
           profile_id: string | null
-          role: Database["public"]["Enums"]["user_role"]
+          role: string
           user_id: string | null
         }
         Insert: {
           created_at?: string | null
           id?: string
           profile_id?: string | null
-          role: Database["public"]["Enums"]["user_role"]
+          role: string
           user_id?: string | null
         }
         Update: {
           created_at?: string | null
           id?: string
           profile_id?: string | null
-          role?: Database["public"]["Enums"]["user_role"]
+          role?: string
           user_id?: string | null
         }
         Relationships: []
