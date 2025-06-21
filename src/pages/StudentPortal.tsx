@@ -5,6 +5,8 @@ import { StudentDashboard } from '@/components/student/StudentDashboard';
 import { AssignedQuizzes } from '@/components/student/AssignedQuizzes';
 import { QuizResults } from '@/components/student/QuizResults';
 import { QuizTaking } from '@/components/student/QuizTaking';
+import { Leaderboard } from '@/components/student/Leaderboard';
+import { StudyMaterials } from '@/components/student/StudyMaterials';
 import { useToast } from '@/hooks/use-toast';
 
 export default function StudentPortal() {
@@ -43,9 +45,7 @@ export default function StudentPortal() {
         />
       </StudentLayout>
     );
-  }
-
-  const renderPage = () => {
+  }  const renderPage = () => {
     switch (currentPage) {
       case 'dashboard':
         return <StudentDashboard onStartQuiz={handleStartQuiz} />;
@@ -53,6 +53,10 @@ export default function StudentPortal() {
         return <AssignedQuizzes onStartQuiz={handleStartQuiz} />;
       case 'results':
         return <QuizResults />;
+      case 'leaderboard':
+        return <Leaderboard />;
+      case 'materials':
+        return <StudyMaterials />;
       case 'achievements':
         return <div className="text-center py-8 text-gray-500">Achievements system coming soon...</div>;
       case 'profile':

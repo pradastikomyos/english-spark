@@ -11,7 +11,9 @@ import {
   LogOut,
   Menu,
   X,
-  BookOpen
+  BookOpen,
+  PlayCircle,
+  Trophy
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -23,11 +25,12 @@ interface StudentLayoutProps {
 
 export function StudentLayout({ children, currentPage, onPageChange }: StudentLayoutProps) {
   const { signOut } = useAuth();
-  const [sidebarOpen, setSidebarOpen] = useState(false);
-  const navigation = [
+  const [sidebarOpen, setSidebarOpen] = useState(false);  const navigation = [
     { name: 'Dashboard', id: 'dashboard', icon: Home },
     { name: 'Assigned Quizzes', id: 'assigned', icon: ClipboardList },
     { name: 'Quiz Results', id: 'results', icon: BarChart3 },
+    { name: 'Leaderboard', id: 'leaderboard', icon: Trophy },
+    { name: 'Study Materials', id: 'materials', icon: BookOpen },
     { name: 'Achievements', id: 'achievements', icon: Award },
     { name: 'Profile', id: 'profile', icon: User },
   ];
