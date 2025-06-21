@@ -40,6 +40,7 @@ export function StudentsManagement() {
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [editingStudent, setEditingStudent] = useState<Student | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
     studentId: '',
@@ -177,10 +178,15 @@ export function StudentsManagement() {
   const resetForm = () => {
     setFormData({ name: '', studentId: '', classId: '', password: '' });
     setEditingStudent(null);
-  };  const handleAddStudent = async (e: React.FormEvent) => {
+  };
+
+  const handleAddStudent = async (e: React.FormEvent) => {
     e.preventDefault();
     
+    if (isSubmitting) return;
+    
     try {
+      setIsSubmitting(true);
       const email = generateEmail(formData.name);
       
       // Auto-generate student ID if not provided
@@ -207,10 +213,13 @@ export function StudentsManagement() {
         .select('student_id')
         .eq('student_id', studentId)
         .single();
-        if (existingStudent) {
+        
+      if (existingStudent) {
         // Generate new unique ID
         studentId = `STD${Date.now()}_${Math.random().toString(36).substr(2, 5)}`;
-      }      // STEP 1: Create AUTH USER via signup
+      }
+      
+      // STEP 1: Create AUTH USER via signup
       const defaultPassword = formData.password || 'student123'; // Standard default password
       console.log('🔑 Creating auth user for:', email, 'with password: student123');
       
@@ -223,6 +232,15 @@ export function StudentsManagement() {
       });
 
       if (authError) {
+        // If user already exists, try to get the existing user
+        if (authError.message.includes('already registered')) {
+          toast({
+            title: 'Error',
+            description: 'A user with this email already exists. Please use a different name.',
+            variant: 'destructive',
+          });
+          return;
+        }
         console.error('❌ Auth creation error:', authError);
         throw new Error(`Failed to create auth user: ${authError.message}`);
       }
@@ -289,6 +307,8 @@ export function StudentsManagement() {
         description: error.message || 'Failed to add student',
         variant: 'destructive',
       });
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -310,6 +330,7 @@ export function StudentsManagement() {
     if (!editingStudent) return;
     
     try {
+      setIsSubmitting(true);
       const email = generateEmail(formData.name);
       
       console.log('🔄 Updating student:', { 
@@ -360,6 +381,8 @@ export function StudentsManagement() {
         description: error.message || 'Failed to update student',
         variant: 'destructive',
       });
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -459,7 +482,8 @@ export function StudentsManagement() {
                     placeholder="Enter student's full name"
                     required
                   />
-                </div>                <div className="space-y-2">
+                </div>
+                <div className="space-y-2">
                   <Label htmlFor="studentId">Student ID (Optional)</Label>
                   <Input
                     id="studentId"
@@ -483,24 +507,27 @@ export function StudentsManagement() {
                       ))}
                     </SelectContent>
                   </Select>
-                </div>                <div className="space-y-2">
+                </div>
+                <div className="space-y-2">
                   <Label htmlFor="password">Password</Label>
                   <Input
                     id="password"
                     type="password"
                     value={formData.password}
                     onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                    placeholder="Default: 123456"
+                    placeholder="Default: student123"
                   />
-                  <p className="text-xs text-gray-500">Leave empty to use default password: 123456</p>
+                  <p className="text-xs text-gray-500">Leave empty to use default password: student123</p>
                 </div>
                 {formData.name && (
-                  <div className="text-sm text-gray-600">
-                    Email will be: {generateEmail(formData.name)}
+                  <div className="text-sm text-gray-600 p-3 bg-blue-50 rounded-lg">
+                    <strong>Login Details:</strong><br />
+                    Email: {generateEmail(formData.name)}<br />
+                    Password: {formData.password || 'student123'}
                   </div>
                 )}
-                <Button type="submit" className="w-full">
-                  Add Student
+                <Button type="submit" className="w-full" disabled={isSubmitting}>
+                  {isSubmitting ? 'Adding Student...' : 'Add Student'}
                 </Button>
               </form>
             </DialogContent>
@@ -580,8 +607,8 @@ export function StudentsManagement() {
               >
                 Cancel
               </Button>
-              <Button type="submit" className="flex-1">
-                Update Student
+              <Button type="submit" className="flex-1" disabled={isSubmitting}>
+                {isSubmitting ? 'Updating...' : 'Update Student'}
               </Button>
             </div>
           </form>
@@ -635,7 +662,7 @@ export function StudentsManagement() {
                 ) : filteredStudents.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={8} className="text-center py-8 text-gray-500">
-                      No students found. Click "Add Student" to get started!
+                      {students.length === 0 ? 'No students found. Add some students to get started!' : 'No students match your search.'}
                     </TableCell>
                   </TableRow>
                 ) : (
