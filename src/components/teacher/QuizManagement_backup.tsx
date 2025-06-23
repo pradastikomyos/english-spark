@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
@@ -26,7 +25,11 @@ interface Quiz {
   status?: string;
   created_at: string;
   updated_at?: string;
-  questions?: { length: number } | Question[];
+  questions?: QuestionCount | Question[];
+}
+
+interface QuestionCount {
+  length: number;
 }
 
 interface Question {
@@ -40,19 +43,23 @@ interface Question {
   points: number;
 }
 
+type DifficultyLevel = 'easy' | 'medium' | 'hard';
+
 export function QuizManagement() {
   const { profileId } = useAuth();
   const { toast } = useToast();
   const [quizzes, setQuizzes] = useState<Quiz[]>([]);
-  const [loading, setLoading] = useState(true);  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [currentQuiz, setCurrentQuiz] = useState<Quiz | null>(null);
   const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
   const [quizToDelete, setQuizToDelete] = useState<Quiz | null>(null);
-    const [quizForm, setQuizForm] = useState({
+
+  const [quizForm, setQuizForm] = useState({
     title: '',
     description: '',
-    difficulty: 'medium' as 'easy' | 'medium' | 'hard',
+    difficulty: 'medium' as DifficultyLevel,
     timeLimit: 600,
     pointsPerQuestion: 10,
   });
@@ -61,17 +68,23 @@ export function QuizManagement() {
     if (profileId) {
       fetchQuizzes();
     }
-  }, [profileId]);  const fetchQuizzes = async () => {
+  }, [profileId]);
+
+  const fetchQuizzes = async () => {
     try {
       setLoading(true);
-      console.log('🔍 Fetching quizzes for teacher:', profileId);      const { data, error }: { data: any[] | null; error: any } = await supabase
+      console.log('🔍 Fetching quizzes for teacher:', profileId);
+
+      const { data, error } = await supabase
         .from('quizzes')
         .select('*')
         .eq('teacher_id', profileId)
         .order('created_at', { ascending: false });
 
+      if (error) throw error;
+
       // Get questions count for each quiz
-      let quizzesWithQuestions = data || [];
+      let quizzesWithQuestions: Quiz[] = data || [];
       if (data && data.length > 0) {
         const quizIds = data.map(q => q.id);
         const { data: questionsData } = await supabase
@@ -80,16 +93,17 @@ export function QuizManagement() {
           .in('quiz_id', quizIds);
 
         // Count questions per quiz
-        const questionCounts = questionsData?.reduce((acc, q) => {
+        const questionCounts: Record<string, number> = questionsData?.reduce((acc, q) => {
           acc[q.quiz_id] = (acc[q.quiz_id] || 0) + 1;
           return acc;
         }, {} as Record<string, number>) || {};
 
         quizzesWithQuestions = data.map(quiz => ({
           ...quiz,
-          questions: { length: questionCounts[quiz.id] || 0 }
+          questions: { length: questionCounts[quiz.id] || 0 } as QuestionCount
         }));
-      }      
+      }
+
       setQuizzes(quizzesWithQuestions);
     } catch (error: any) {
       console.error('❌ Quiz fetch error:', error);
@@ -97,7 +111,8 @@ export function QuizManagement() {
         title: 'Error',
         description: 'Failed to fetch quizzes',
         variant: 'destructive',
-      });    } finally {
+      });
+    } finally {
       setLoading(false);
     }
   };
@@ -118,7 +133,6 @@ export function QuizManagement() {
     try {
       console.log('🎯 Creating quiz basic (no questions yet):', quizForm);
       
-      // Create quiz without questions first (basic CRUD)
       const { data: quiz, error: quizError } = await supabase
         .from('quizzes')
         .insert({
@@ -242,6 +256,7 @@ export function QuizManagement() {
       });
     }
   };
+
   const openEditDialog = (quiz: Quiz) => {
     setCurrentQuiz(quiz);
     setQuizForm({
@@ -265,7 +280,8 @@ export function QuizManagement() {
   };
 
   const closeEditDialog = () => {
-    setIsEditDialogOpen(false);    setCurrentQuiz(null);
+    setIsEditDialogOpen(false);
+    setCurrentQuiz(null);
     resetForm();
   };
 
@@ -278,13 +294,26 @@ export function QuizManagement() {
     }
   };
 
+  const getQuestionCount = (quiz: Quiz): number => {
+    if (!quiz.questions) return 0;
+    if (typeof quiz.questions === 'object' && 'length' in quiz.questions) {
+      return quiz.questions.length;
+    }
+    if (Array.isArray(quiz.questions)) {
+      return quiz.questions.length;
+    }
+    return 0;
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Quiz Management</h1>
           <p className="text-gray-600">Create and manage your quizzes</p>
-        </div>        {/* Create Quiz Dialog */}
+        </div>
+
+        {/* Create Quiz Dialog */}
         <Dialog open={isCreateDialogOpen} onOpenChange={closeCreateDialog}>
           <DialogTrigger asChild>
             <Button>
@@ -323,7 +352,7 @@ export function QuizManagement() {
                 <Label htmlFor="difficulty">Difficulty</Label>
                 <Select
                   value={quizForm.difficulty}
-                  onValueChange={(value: 'easy' | 'medium' | 'hard') => 
+                  onValueChange={(value: DifficultyLevel) => 
                     setQuizForm({ ...quizForm, difficulty: value })
                   }
                 >
@@ -408,7 +437,7 @@ export function QuizManagement() {
                 <Label htmlFor="edit-difficulty">Difficulty</Label>
                 <Select
                   value={quizForm.difficulty}
-                  onValueChange={(value: 'easy' | 'medium' | 'hard') => 
+                  onValueChange={(value: DifficultyLevel) => 
                     setQuizForm({ ...quizForm, difficulty: value })
                   }
                 >
@@ -451,7 +480,8 @@ export function QuizManagement() {
               <div className="flex gap-2 pt-4">
                 <Button type="submit" className="flex-1">
                   Update Quiz
-                </Button>                <Button type="button" variant="outline" onClick={closeEditDialog}>
+                </Button>
+                <Button type="button" variant="outline" onClick={closeEditDialog}>
                   Cancel
                 </Button>
               </div>
@@ -508,18 +538,10 @@ export function QuizManagement() {
               </CardHeader>
               <CardContent>
                 <div className="space-y-3">
-                  <div className="flex items-center gap-4 text-sm text-gray-600">                    <div className="flex items-center gap-1">
+                  <div className="flex items-center gap-4 text-sm text-gray-600">
+                    <div className="flex items-center gap-1">
                       <FileText className="h-4 w-4" />
-                      {(() => {
-                        if (!quiz.questions) return 0;
-                        if (typeof quiz.questions === 'object' && 'length' in quiz.questions) {
-                          return quiz.questions.length;
-                        }
-                        if (Array.isArray(quiz.questions)) {
-                          return quiz.questions.length;
-                        }
-                        return 0;
-                      })()} questions
+                      {getQuestionCount(quiz)} questions
                     </div>
                     <div className="flex items-center gap-1">
                       <Clock className="h-4 w-4" />
@@ -529,7 +551,9 @@ export function QuizManagement() {
                       <Award className="h-4 w-4" />
                       {quiz.points_per_question}pts
                     </div>
-                  </div>                  <div className="flex gap-2">
+                  </div>
+
+                  <div className="flex gap-2">
                     <Button 
                       variant="outline" 
                       size="sm" 
