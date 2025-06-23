@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
@@ -21,15 +22,12 @@ interface Quiz {
   time_limit: number;
   points_per_question: number;
   teacher_id?: string;
-  created_by?: string; // for backward compatibility
+  created_by?: string;
   status?: string;
   created_at: string;
   updated_at?: string;
-  questions?: QuestionCount | Question[];
-}
-
-interface QuestionCount {
-  length: number;
+  total_questions?: number;
+  questionCount?: number;
 }
 
 interface Question {
@@ -41,6 +39,7 @@ interface Question {
   option_d: string;
   correct_answer: string;
   points: number;
+  difficulty: 'easy' | 'medium' | 'hard';
 }
 
 type DifficultyLevel = 'easy' | 'medium' | 'hard';
@@ -59,9 +58,8 @@ export function QuizManagement() {
   const [quizForm, setQuizForm] = useState({
     title: '',
     description: '',
-    difficulty: 'medium' as DifficultyLevel,
-    timeLimit: 600,
-    pointsPerQuestion: 10,
+    totalQuestions: 30,
+    timeLimit: 1800, // 30 minutes for 30 questions
   });
 
   useEffect(() => {
@@ -78,7 +76,7 @@ export function QuizManagement() {
       const { data, error } = await supabase
         .from('quizzes')
         .select('*')
-        .eq('teacher_id', profileId)
+        .eq('created_by', profileId)
         .order('created_at', { ascending: false });
 
       if (error) throw error;
@@ -93,14 +91,16 @@ export function QuizManagement() {
           .in('quiz_id', quizIds);
 
         // Count questions per quiz
-        const questionCounts: Record<string, number> = questionsData?.reduce((acc, q) => {
-          acc[q.quiz_id] = (acc[q.quiz_id] || 0) + 1;
-          return acc;
-        }, {} as Record<string, number>) || {};
+        const questionCounts: Record<string, number> = {};
+        if (questionsData) {
+          questionsData.forEach(q => {
+            questionCounts[q.quiz_id] = (questionCounts[q.quiz_id] || 0) + 1;
+          });
+        }
 
         quizzesWithQuestions = data.map(quiz => ({
           ...quiz,
-          questions: { length: questionCounts[quiz.id] || 0 } as QuestionCount
+          questionCount: questionCounts[quiz.id] || 0
         }));
       }
 
@@ -121,27 +121,39 @@ export function QuizManagement() {
     setQuizForm({
       title: '',
       description: '',
-      difficulty: 'medium',
-      timeLimit: 600,
-      pointsPerQuestion: 10,
+      totalQuestions: 30,
+      timeLimit: 1800,
     });
+  };
+
+  const calculateTotalPoints = (totalQuestions: number) => {
+    // 10 easy (2 pts), 10 medium (3 pts), 10 hard (5 pts)
+    const questionsPerDifficulty = Math.floor(totalQuestions / 3);
+    const easyPoints = questionsPerDifficulty * 2;
+    const mediumPoints = questionsPerDifficulty * 3;
+    const hardPoints = questionsPerDifficulty * 5;
+    return easyPoints + mediumPoints + hardPoints;
   };
 
   const handleCreateQuiz = async (e: React.FormEvent) => {
     e.preventDefault();
     
     try {
-      console.log('🎯 Creating quiz basic (no questions yet):', quizForm);
+      console.log('🎯 Creating quiz with gamification:', quizForm);
+      
+      const totalPoints = calculateTotalPoints(quizForm.totalQuestions);
       
       const { data: quiz, error: quizError } = await supabase
         .from('quizzes')
         .insert({
           title: quizForm.title,
           description: quizForm.description,
-          difficulty: quizForm.difficulty,
+          difficulty: 'medium' as DifficultyLevel, // Default, akan dioverride per question
           time_limit: quizForm.timeLimit,
-          points_per_question: quizForm.pointsPerQuestion,
-          teacher_id: profileId,
+          points_per_question: 0, // Will be set per question
+          total_questions: quizForm.totalQuestions,
+          total_points: totalPoints,
+          created_by: profileId,
         })
         .select()
         .single();
@@ -152,7 +164,7 @@ export function QuizManagement() {
 
       toast({
         title: 'Success',
-        description: 'Quiz created successfully! You can add questions later.',
+        description: `Quiz created successfully! Total points: ${totalPoints}. Add questions next.`,
       });
 
       setIsCreateDialogOpen(false);
@@ -176,14 +188,16 @@ export function QuizManagement() {
     try {
       console.log('✏️ Updating quiz:', currentQuiz.id, quizForm);
       
+      const totalPoints = calculateTotalPoints(quizForm.totalQuestions);
+      
       const { data: quiz, error: quizError } = await supabase
         .from('quizzes')
         .update({
           title: quizForm.title,
           description: quizForm.description,
-          difficulty: quizForm.difficulty,
           time_limit: quizForm.timeLimit,
-          points_per_question: quizForm.pointsPerQuestion,
+          total_questions: quizForm.totalQuestions,
+          total_points: totalPoints,
           updated_at: new Date().toISOString(),
         })
         .eq('id', currentQuiz.id)
@@ -262,9 +276,8 @@ export function QuizManagement() {
     setQuizForm({
       title: quiz.title,
       description: quiz.description,
-      difficulty: quiz.difficulty,
+      totalQuestions: quiz.total_questions || 30,
       timeLimit: quiz.time_limit,
-      pointsPerQuestion: quiz.points_per_question,
     });
     setIsEditDialogOpen(true);
   };
@@ -285,24 +298,8 @@ export function QuizManagement() {
     resetForm();
   };
 
-  const getDifficultyColor = (difficulty: string) => {
-    switch (difficulty) {
-      case 'easy': return 'bg-green-100 text-green-800';
-      case 'medium': return 'bg-yellow-100 text-yellow-800';
-      case 'hard': return 'bg-red-100 text-red-800';
-      default: return 'bg-gray-100 text-gray-800';
-    }
-  };
-
   const getQuestionCount = (quiz: Quiz): number => {
-    if (!quiz.questions) return 0;
-    if (typeof quiz.questions === 'object' && 'length' in quiz.questions) {
-      return quiz.questions.length;
-    }
-    if (Array.isArray(quiz.questions)) {
-      return quiz.questions.length;
-    }
-    return 0;
+    return quiz.questionCount || 0;
   };
 
   return (
@@ -310,7 +307,7 @@ export function QuizManagement() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Quiz Management</h1>
-          <p className="text-gray-600">Create and manage your quizzes</p>
+          <p className="text-gray-600">Create and manage your gamified quizzes</p>
         </div>
 
         {/* Create Quiz Dialog */}
@@ -323,16 +320,16 @@ export function QuizManagement() {
           </DialogTrigger>
           <DialogContent className="max-w-md">
             <DialogHeader>
-              <DialogTitle>Create New Quiz</DialogTitle>
+              <DialogTitle>Create New Gamified Quiz</DialogTitle>
             </DialogHeader>
             <form onSubmit={handleCreateQuiz} className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="title">Quiz Title</Label>
+                <Label htmlFor="title">Quiz Name</Label>
                 <Input
                   id="title"
                   value={quizForm.title}
                   onChange={(e) => setQuizForm({ ...quizForm, title: e.target.value })}
-                  placeholder="Enter quiz title"
+                  placeholder="Enter quiz name"
                   required
                 />
               </div>
@@ -349,46 +346,41 @@ export function QuizManagement() {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="difficulty">Difficulty</Label>
-                <Select
-                  value={quizForm.difficulty}
-                  onValueChange={(value: DifficultyLevel) => 
-                    setQuizForm({ ...quizForm, difficulty: value })
-                  }
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="easy">Easy</SelectItem>
-                    <SelectItem value="medium">Medium</SelectItem>
-                    <SelectItem value="hard">Hard</SelectItem>
-                  </SelectContent>
-                </Select>
+                <Label htmlFor="totalQuestions">Total Questions</Label>
+                <Input
+                  id="totalQuestions"
+                  type="number"
+                  value={quizForm.totalQuestions}
+                  onChange={(e) => setQuizForm({ ...quizForm, totalQuestions: parseInt(e.target.value) || 30 })}
+                  min={3}
+                  max={90}
+                  placeholder="30"
+                />
+                <p className="text-xs text-gray-500">
+                  Questions will be divided equally: Easy (2pts), Medium (3pts), Hard (5pts)
+                </p>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="timeLimit">Time Limit (minutes)</Label>
-                  <Input
-                    id="timeLimit"
-                    type="number"
-                    value={Math.floor(quizForm.timeLimit / 60)}
-                    onChange={(e) => setQuizForm({ ...quizForm, timeLimit: parseInt(e.target.value) * 60 })}
-                    min={1}
-                    max={60}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="pointsPerQuestion">Points per Question</Label>
-                  <Input
-                    id="pointsPerQuestion"
-                    type="number"
-                    value={quizForm.pointsPerQuestion}
-                    onChange={(e) => setQuizForm({ ...quizForm, pointsPerQuestion: parseInt(e.target.value) })}
-                    min={1}
-                    max={100}
-                  />
+              <div className="space-y-2">
+                <Label htmlFor="timeLimit">Time Limit (minutes)</Label>
+                <Input
+                  id="timeLimit"
+                  type="number"
+                  value={Math.floor(quizForm.timeLimit / 60)}
+                  onChange={(e) => setQuizForm({ ...quizForm, timeLimit: parseInt(e.target.value) * 60 })}
+                  min={10}
+                  max={120}
+                />
+              </div>
+
+              <div className="bg-blue-50 p-3 rounded-lg">
+                <h4 className="font-medium text-blue-900 mb-2">Gamification Preview:</h4>
+                <div className="text-sm text-blue-800 space-y-1">
+                  <div>📚 Total Questions: {quizForm.totalQuestions}</div>
+                  <div>🎯 Total Points: {calculateTotalPoints(quizForm.totalQuestions)}</div>
+                  <div>⭐ Easy: {Math.floor(quizForm.totalQuestions / 3)} × 2pts</div>
+                  <div>🔥 Medium: {Math.floor(quizForm.totalQuestions / 3)} × 3pts</div>
+                  <div>💎 Hard: {Math.floor(quizForm.totalQuestions / 3)} × 5pts</div>
                 </div>
               </div>
 
@@ -412,12 +404,12 @@ export function QuizManagement() {
             </DialogHeader>
             <form onSubmit={handleEditQuiz} className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="edit-title">Quiz Title</Label>
+                <Label htmlFor="edit-title">Quiz Name</Label>
                 <Input
                   id="edit-title"
                   value={quizForm.title}
                   onChange={(e) => setQuizForm({ ...quizForm, title: e.target.value })}
-                  placeholder="Enter quiz title"
+                  placeholder="Enter quiz name"
                   required
                 />
               </div>
@@ -434,47 +426,27 @@ export function QuizManagement() {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="edit-difficulty">Difficulty</Label>
-                <Select
-                  value={quizForm.difficulty}
-                  onValueChange={(value: DifficultyLevel) => 
-                    setQuizForm({ ...quizForm, difficulty: value })
-                  }
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="easy">Easy</SelectItem>
-                    <SelectItem value="medium">Medium</SelectItem>
-                    <SelectItem value="hard">Hard</SelectItem>
-                  </SelectContent>
-                </Select>
+                <Label htmlFor="edit-totalQuestions">Total Questions</Label>
+                <Input
+                  id="edit-totalQuestions"
+                  type="number"
+                  value={quizForm.totalQuestions}
+                  onChange={(e) => setQuizForm({ ...quizForm, totalQuestions: parseInt(e.target.value) || 30 })}
+                  min={3}
+                  max={90}
+                />
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="edit-timeLimit">Time Limit (minutes)</Label>
-                  <Input
-                    id="edit-timeLimit"
-                    type="number"
-                    value={Math.floor(quizForm.timeLimit / 60)}
-                    onChange={(e) => setQuizForm({ ...quizForm, timeLimit: parseInt(e.target.value) * 60 })}
-                    min={1}
-                    max={60}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="edit-pointsPerQuestion">Points per Question</Label>
-                  <Input
-                    id="edit-pointsPerQuestion"
-                    type="number"
-                    value={quizForm.pointsPerQuestion}
-                    onChange={(e) => setQuizForm({ ...quizForm, pointsPerQuestion: parseInt(e.target.value) })}
-                    min={1}
-                    max={100}
-                  />
-                </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit-timeLimit">Time Limit (minutes)</Label>
+                <Input
+                  id="edit-timeLimit"
+                  type="number"
+                  value={Math.floor(quizForm.timeLimit / 60)}
+                  onChange={(e) => setQuizForm({ ...quizForm, timeLimit: parseInt(e.target.value) * 60 })}
+                  min={10}
+                  max={120}
+                />
               </div>
 
               <div className="flex gap-2 pt-4">
@@ -518,7 +490,7 @@ export function QuizManagement() {
           </div>
         ) : quizzes.length === 0 ? (
           <div className="col-span-full text-center py-8 text-gray-500">
-            No quizzes created yet. Create your first quiz!
+            No quizzes created yet. Create your first gamified quiz!
           </div>
         ) : (
           quizzes.map((quiz) => (
@@ -531,8 +503,8 @@ export function QuizManagement() {
                       {quiz.description}
                     </CardDescription>
                   </div>
-                  <Badge className={getDifficultyColor(quiz.difficulty)}>
-                    {quiz.difficulty}
+                  <Badge className="bg-purple-100 text-purple-800">
+                    Gamified
                   </Badge>
                 </div>
               </CardHeader>
@@ -541,7 +513,7 @@ export function QuizManagement() {
                   <div className="flex items-center gap-4 text-sm text-gray-600">
                     <div className="flex items-center gap-1">
                       <FileText className="h-4 w-4" />
-                      {getQuestionCount(quiz)} questions
+                      {getQuestionCount(quiz)} / {quiz.total_questions || 30} questions
                     </div>
                     <div className="flex items-center gap-1">
                       <Clock className="h-4 w-4" />
@@ -549,7 +521,25 @@ export function QuizManagement() {
                     </div>
                     <div className="flex items-center gap-1">
                       <Award className="h-4 w-4" />
-                      {quiz.points_per_question}pts
+                      {quiz.total_points || 100}pts
+                    </div>
+                  </div>
+
+                  <div className="bg-gray-50 p-2 rounded text-xs">
+                    <div className="font-medium mb-1">Point Distribution:</div>
+                    <div className="grid grid-cols-3 gap-1 text-center">
+                      <div className="bg-green-100 p-1 rounded">
+                        <div className="font-medium text-green-800">Easy</div>
+                        <div className="text-green-600">2pts</div>
+                      </div>
+                      <div className="bg-yellow-100 p-1 rounded">
+                        <div className="font-medium text-yellow-800">Medium</div>
+                        <div className="text-yellow-600">3pts</div>
+                      </div>
+                      <div className="bg-red-100 p-1 rounded">
+                        <div className="font-medium text-red-800">Hard</div>
+                        <div className="text-red-600">5pts</div>
+                      </div>
                     </div>
                   </div>
 
