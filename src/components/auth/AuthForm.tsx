@@ -8,8 +8,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
-import { supabase } from '@/integrations/supabase/client';
 import { BookOpen, Users, GraduationCap } from 'lucide-react';
+
+type UserRole = 'student' | 'teacher';
 
 export function AuthForm() {
   const [isLoading, setIsLoading] = useState(false);
@@ -25,7 +26,7 @@ export function AuthForm() {
     name: '',
     email: '',
     password: '',
-    role: 'teacher' as 'teacher' | 'student',
+    role: 'teacher' as UserRole,
     studentId: '',
     className: '',
   });
@@ -35,24 +36,11 @@ export function AuthForm() {
     setIsLoading(true);
 
     try {
-      const { error } = await signIn(signInData.email, signInData.password);
-      
-      if (error) {
-        toast({
-          title: 'Error',
-          description: error.message,
-          variant: 'destructive',
-        });
-      } else {
-        toast({
-          title: 'Success',
-          description: 'Signed in successfully!',
-        });
-      }
-    } catch (error) {
+      await signIn(signInData.email, signInData.password);
+    } catch (error: any) {
       toast({
         title: 'Error',
-        description: 'An unexpected error occurred',
+        description: error.message || 'An unexpected error occurred',
         variant: 'destructive',
       });
     } finally {
@@ -66,28 +54,22 @@ export function AuthForm() {
 
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
-    setIsLoading(true);    try {
+    setIsLoading(true);
+
+    try {
       const email = signUpData.role === 'student' ? generateEmail(signUpData.name) : signUpData.email;
       
       console.log('🚀 Starting signup for:', email, 'Role:', signUpData.role);
       
-      const { error } = await signUp(email, signUpData.password, signUpData);
+      await signUp(email, signUpData.password, signUpData.name, signUpData.role);
       
-      if (error) {
-        console.error('❌ Auth signup error:', error);
-        toast({
-          title: 'Error',
-          description: error.message,
-          variant: 'destructive',
-        });
-        return;
-      }
-
-      console.log('✅ Auth signup successful!');      // Skip profile creation for now, just show success  
+      console.log('✅ Auth signup successful!');
+      
       toast({
         title: 'Success',
         description: 'Account created successfully! Please sign in.',
-      });} catch (error: any) {
+      });
+    } catch (error: any) {
       console.error('Signup error:', error);
       toast({
         title: 'Error',
@@ -158,7 +140,7 @@ export function AuthForm() {
                   <Label htmlFor="role">Role</Label>
                   <Select
                     value={signUpData.role}
-                    onValueChange={(value: 'teacher' | 'student') => 
+                    onValueChange={(value: UserRole) => 
                       setSignUpData({ ...signUpData, role: value })
                     }
                   >

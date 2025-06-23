@@ -152,10 +152,13 @@ export type Database = {
           created_by: string | null
           description: string | null
           difficulty: Database["public"]["Enums"]["difficulty_level"] | null
+          gamification: Json | null
           id: string
           points_per_question: number | null
           time_limit: number | null
           title: string
+          total_points: number | null
+          total_questions: number | null
           updated_at: string | null
         }
         Insert: {
@@ -163,10 +166,13 @@ export type Database = {
           created_by?: string | null
           description?: string | null
           difficulty?: Database["public"]["Enums"]["difficulty_level"] | null
+          gamification?: Json | null
           id?: string
           points_per_question?: number | null
           time_limit?: number | null
           title: string
+          total_points?: number | null
+          total_questions?: number | null
           updated_at?: string | null
         }
         Update: {
@@ -174,10 +180,13 @@ export type Database = {
           created_by?: string | null
           description?: string | null
           difficulty?: Database["public"]["Enums"]["difficulty_level"] | null
+          gamification?: Json | null
           id?: string
           points_per_question?: number | null
           time_limit?: number | null
           title?: string
+          total_points?: number | null
+          total_questions?: number | null
           updated_at?: string | null
         }
         Relationships: []
