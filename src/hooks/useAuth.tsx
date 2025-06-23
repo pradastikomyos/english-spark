@@ -9,6 +9,7 @@ type UserRole = 'student' | 'teacher';
 interface AuthContextType {
   user: User | null;
   role: UserRole | null;
+  userRole: UserRole | null; // Added for compatibility
   profileId: string | null;
   loading: boolean;
   signIn: (email: string, password: string) => Promise<void>;
@@ -70,7 +71,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const signIn = async (email: string, password: string) => {
+  const signIn = async (email: string, password: string): Promise<void> => {
     try {
       const { error } = await supabase.auth.signInWithPassword({
         email,
@@ -93,7 +94,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const signUp = async (email: string, password: string, name: string, userRole: UserRole) => {
+  const signUp = async (email: string, password: string, name: string, userRole: UserRole): Promise<void> => {
     try {
       const { data, error } = await supabase.auth.signUp({
         email,
@@ -186,6 +187,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       value={{
         user,
         role,
+        userRole: role, // Added for compatibility
         profileId,
         loading,
         signIn,
