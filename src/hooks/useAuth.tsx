@@ -1,19 +1,18 @@
 
-import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
-import { User, Session } from '@supabase/supabase-js';
+import { useState, useEffect, createContext, useContext, ReactNode } from 'react';
+import { User } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
-import type { Database } from '@/integrations/supabase/types';
+import { useToast } from '@/hooks/use-toast';
 
-type UserRole = Database['public']['Enums']['user_role'];
+type UserRole = 'student' | 'teacher';
 
 interface AuthContextType {
   user: User | null;
-  session: Session | null;
-  userRole: UserRole | null;
+  role: UserRole | null;
   profileId: string | null;
   loading: boolean;
-  signIn: (email: string, password: string) => Promise<{ error?: any }>;
-  signUp: (email: string, password: string, userData: any) => Promise<{ error?: any }>;
+  signIn: (email: string, password: string) => Promise<void>;
+  signUp: (email: string, password: string, name: string, role: UserRole) => Promise<void>;
   signOut: () => Promise<void>;
 }
 
@@ -21,54 +20,30 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
-  const [session, setSession] = useState<Session | null>(null);
-  const [userRole, setUserRole] = useState<UserRole | null>(null);
+  const [role, setRole] = useState<UserRole | null>(null);
   const [profileId, setProfileId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const { toast } = useToast();
 
   useEffect(() => {
-    // Set up auth state listener
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
-        setSession(session);
-        setUser(session?.user ?? null);        if (session?.user) {
-          // Fetch user role and profile ID with optimized query
-          try {
-            const { data: roleData, error: roleError } = await supabase
-              .from('user_roles')
-              .select('role, profile_id')
-              .eq('user_id', session.user.id)
-              .single();
-            
-            if (roleData && !roleError) {
-              setUserRole(roleData.role);
-              setProfileId(roleData.profile_id);
-            } else {
-              // If no role found, user might be newly created
-              console.log('No role found for user, might need profile setup');
-              setUserRole(null);
-              setProfileId(null);
-            }
-            setLoading(false);
-          } catch (error) {
-            console.error('Error fetching user role:', error);
-            setUserRole(null);
-            setProfileId(null);
-            setLoading(false);
-          }
-        } else {
-          setUserRole(null);
-          setProfileId(null);
-          setLoading(false);
-        }
-      }
-    );
-
-    // Check for existing session
+    // Get initial session
     supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
       setUser(session?.user ?? null);
-      if (!session) {
+      if (session?.user) {
+        fetchUserRole(session.user.id);
+      } else {
+        setLoading(false);
+      }
+    });
+
+    // Listen for auth changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user ?? null);
+      if (session?.user) {
+        fetchUserRole(session.user.id);
+      } else {
+        setRole(null);
+        setProfileId(null);
         setLoading(false);
       }
     });
@@ -76,78 +51,141 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => subscription.unsubscribe();
   }, []);
 
-  const signIn = async (email: string, password: string) => {
-    const { error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
-    return { error };
+  const fetchUserRole = async (userId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('user_roles')
+        .select('role, profile_id')
+        .eq('user_id', userId)
+        .single();
+
+      if (error) throw error;
+
+      setRole(data.role as UserRole);
+      setProfileId(data.profile_id);
+    } catch (error) {
+      console.error('Error fetching user role:', error);
+    } finally {
+      setLoading(false);
+    }
   };
-  const signUp = async (email: string, password: string, userData: any) => {
+
+  const signIn = async (email: string, password: string) => {
+    try {
+      const { error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+
+      if (error) throw error;
+
+      toast({
+        title: 'Success',
+        description: 'Signed in successfully!',
+      });
+    } catch (error: any) {
+      toast({
+        title: 'Error',
+        description: error.message,
+        variant: 'destructive',
+      });
+      throw error;
+    }
+  };
+
+  const signUp = async (email: string, password: string, name: string, userRole: UserRole) => {
     try {
       const { data, error } = await supabase.auth.signUp({
         email,
         password,
         options: {
-          emailRedirectTo: `${window.location.origin}/`,
-        },
+          data: {
+            name,
+            role: userRole,
+          }
+        }
       });
 
-      if (error) return { error };
+      if (error) throw error;
 
-      // If user is created successfully and we have user data
-      if (data.user && userData.name) {
-        // Create student profile automatically
-        try {
-          const studentData = {
-            id: data.user.id,
-            user_id: data.user.id,
-            name: userData.name,
-            email: email,
-            student_id: `STD${Date.now()}`, // Generate unique student ID
-            class_id: null, // Will be assigned by teacher later
-            total_points: 0,
-            level: 1,
-            current_streak: 0,
-          };
+      if (data.user) {
+        let profileId: string;
 
-          const { error: studentError } = await supabase
+        if (userRole === 'teacher') {
+          const { data: teacherData, error: teacherError } = await supabase
+            .from('teachers')
+            .insert({
+              user_id: data.user.id,
+              name,
+              email,
+            })
+            .select()
+            .single();
+
+          if (teacherError) throw teacherError;
+          profileId = teacherData.id;
+        } else {
+          const { data: studentData, error: studentError } = await supabase
             .from('students')
-            .insert(studentData);
+            .insert({
+              user_id: data.user.id,
+              name,
+              email,
+              student_id: `STU${Date.now()}`,
+            })
+            .select()
+            .single();
 
-          if (studentError) {
-            console.error('Error creating student profile:', studentError);
-          } else {
-            // Create user role entry
-            await supabase
-              .from('user_roles')
-              .insert({
-                user_id: data.user.id,
-                role: 'student',
-                profile_id: data.user.id,
-              });
-          }
-        } catch (profileError) {
-          console.error('Error creating profile:', profileError);
+          if (studentError) throw studentError;
+          profileId = studentData.id;
         }
-      }
 
-      return { error: null };
-    } catch (error) {
-      return { error };
+        await supabase
+          .from('user_roles')
+          .insert({
+            user_id: data.user.id,
+            role: userRole,
+            profile_id: profileId,
+          });
+
+        toast({
+          title: 'Success',
+          description: 'Account created successfully!',
+        });
+      }
+    } catch (error: any) {
+      toast({
+        title: 'Error',
+        description: error.message,
+        variant: 'destructive',
+      });
+      throw error;
     }
   };
 
   const signOut = async () => {
-    await supabase.auth.signOut();
+    try {
+      const { error } = await supabase.auth.signOut();
+      if (error) throw error;
+
+      toast({
+        title: 'Success',
+        description: 'Signed out successfully!',
+      });
+    } catch (error: any) {
+      toast({
+        title: 'Error',
+        description: error.message,
+        variant: 'destructive',
+      });
+    }
   };
 
   return (
     <AuthContext.Provider
       value={{
         user,
-        session,
-        userRole,
+        role,
         profileId,
         loading,
         signIn,
