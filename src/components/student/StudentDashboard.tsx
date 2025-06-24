@@ -18,7 +18,9 @@ import {
   Clock,
   BarChart3,
   BookOpen,
-  ClipboardList
+  ClipboardList,
+  Users, // Added for total classmates stat
+  Hash // Added for rank stat
 } from 'lucide-react';
 
 interface StudentData {
@@ -53,8 +55,9 @@ export function StudentDashboard({ onStartQuiz }: StudentDashboardProps) {
     availableQuizzes: [],
     assignedQuizzes: [],
     classRank: 0,
-    totalClassmates: 0,
-  });  const [loading, setLoading] = useState(true);
+  totalClassmates: 0,
+  });
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     if (profileId) {
@@ -158,7 +161,8 @@ export function StudentDashboard({ onStartQuiz }: StudentDashboardProps) {
           classRank: rank,
           totalClassmates: classmates?.length || 0,
         });
-      } else {        setStats({
+      } else {
+        setStats({
           studentData,
           recentQuizzes: recentQuizzes || [],
           achievements: achievements || [],
@@ -186,11 +190,36 @@ export function StudentDashboard({ onStartQuiz }: StudentDashboardProps) {
     return Math.max(0, Math.min(100, progress));
   };
 
+  const StatCard = ({ 
+    title, 
+    value, 
+    icon: Icon, 
+    description, 
+    color = "text-blue-600" 
+  }: {
+    title: string;
+    value: number | string;
+    icon: any;
+    description: string;
+    color?: string;
+  }) => (
+    <Card>
+      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+        <CardTitle className="text-sm font-medium">{title}</CardTitle>
+        <Icon className={`h-4 w-4 ${color}`} />
+      </CardHeader>
+      <CardContent>
+        <div className="text-2xl font-bold">{value}</div>
+        <p className="text-xs text-muted-foreground">{description}</p>
+      </CardContent>
+    </Card>
+  );
+
   if (loading) {
     return (
       <div className="space-y-6">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          {[1, 2, 3].map((i) => (
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+          {[1, 2, 3, 4].map((i) => (
             <Card key={i}>
               <CardContent className="p-6">
                 <div className="animate-pulse space-y-3">
@@ -220,7 +249,40 @@ export function StudentDashboard({ onStartQuiz }: StudentDashboardProps) {
         </p>
       </div>
 
-      {/* Level & Progress Section */}
+      {/* Stats Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-6 max-w-7xl mx-auto">
+        <StatCard
+          title="Total Points"
+          value={studentData?.total_points || 0}
+          icon={Star}
+          description="Points earned across all quizzes"
+          color="text-yellow-600"
+        />
+        <StatCard
+          title="Current Level"
+          value={`Level ${studentData?.level || 1}`}
+          icon={Award}
+          description={`Progress to Level ${(studentData?.level || 1) + 1}`}
+          color="text-purple-600"
+        />
+        <StatCard
+          title="Streak Days"
+          value={studentData?.current_streak || 0}
+          icon={Flame}
+          description="Consecutive days of learning"
+          color="text-orange-600"
+        />
+        <StatCard
+          title="Class Rank"
+          value={stats.classRank > 0 ? `#${stats.classRank} of ${stats.totalClassmates}` : 'N/A'}
+          icon={Hash}
+          description={studentData?.classes?.name ? `In ${studentData.classes.name}` : 'Not in a class'}
+          color="text-blue-600"
+        />
+      </div>
+
+      {/* Level & Progress Section (Optional, can be removed if stats cards are sufficient) */}
+      {/* Keeping it for now as it provides a visual progress bar */}
       <Card className="bg-gradient-to-r from-blue-500 to-green-500 text-white">
         <CardContent className="p-6">
           <div className="flex items-center justify-between">
@@ -258,7 +320,9 @@ export function StudentDashboard({ onStartQuiz }: StudentDashboardProps) {
             />
           </div>
         </CardContent>
-      </Card>      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      </Card>
+      
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Quick Actions */}
         <div className="lg:col-span-2 space-y-6">
           {/* Assigned Quizzes */}
@@ -339,14 +403,16 @@ export function StudentDashboard({ onStartQuiz }: StudentDashboardProps) {
                               )}
                             </div>
                           </div>
-                        </div>                        <Button 
+                        </div>
+                        <Button 
                           size="sm"
                           onClick={() => onStartQuiz(assignment.quiz_id)}
                         >
                           {assignment.completed ? "Review" : "Start"}
                         </Button>
                       </div>
-                    );                  })}
+                    );
+                  })}
                 </div>
               )}
             </CardContent>
@@ -393,7 +459,8 @@ export function StudentDashboard({ onStartQuiz }: StudentDashboardProps) {
                             </span>
                           </div>
                         </div>
-                      </div>                      <Button 
+                      </div>
+                      <Button 
                         size="sm"
                         onClick={() => onStartQuiz(quiz.quiz_id)}
                       >
@@ -452,35 +519,6 @@ export function StudentDashboard({ onStartQuiz }: StudentDashboardProps) {
 
         {/* Sidebar */}
         <div className="space-y-6">
-          {/* Quick Stats */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg">Quick Stats</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-gray-600">Total Points</span>
-                <span className="font-bold text-blue-600">{studentData?.total_points}</span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-gray-600">Current Level</span>
-                <Badge variant="outline">Level {studentData?.level}</Badge>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-gray-600">Streak Days</span>
-                <span className="flex items-center gap-1">
-                  <Flame className="h-4 w-4 text-orange-500" />
-                  {studentData?.current_streak}
-                </span>
-              </div>              {studentData?.classes && (
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-gray-600">Class</span>
-                  <Badge variant="secondary">{studentData.classes.name}</Badge>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-
           {/* Recent Achievements */}
           <Card>
             <CardHeader>
@@ -513,7 +551,8 @@ export function StudentDashboard({ onStartQuiz }: StudentDashboardProps) {
                     </div>
                   ))}
                 </div>
-              )}            </CardContent>
+              )}
+            </CardContent>
           </Card>
         </div>
       </div>
