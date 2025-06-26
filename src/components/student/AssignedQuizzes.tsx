@@ -7,6 +7,17 @@ import { Progress } from '@/components/ui/progress';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
+import {
   Calendar,
   Clock,
   PlayCircle,
@@ -32,6 +43,7 @@ interface AssignedQuiz {
     difficulty: 'easy' | 'medium' | 'hard';
     time_limit: number;
     points_per_question: number;
+    status: 'open' | 'closed'; // Tambahkan status quiz
   };  completion?: {
     id: string;
     score: number;
@@ -51,6 +63,8 @@ export function AssignedQuizzes({ onStartQuiz }: AssignedQuizzesProps) {
   const [assignments, setAssignments] = useState<AssignedQuiz[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<'all' | 'pending' | 'completed'>('all');
+  const [showConfirmDialog, setShowConfirmDialog] = useState(false);
+  const [quizToStartId, setQuizToStartId] = useState<string | null>(null);
 
   useEffect(() => {
     if (profileId) {
@@ -91,7 +105,8 @@ export function AssignedQuizzes({ onStartQuiz }: AssignedQuizzesProps) {
             description,
             difficulty,
             time_limit,
-            points_per_question
+            points_per_question,
+            status
           )
         `)
         .eq('class_id', studentData.class_id)
@@ -108,6 +123,10 @@ export function AssignedQuizzes({ onStartQuiz }: AssignedQuizzesProps) {
       // Combine assignments with completion data
       const enrichedAssignments = assignmentsData?.map(assignment => ({
         ...assignment,
+        quiz: {
+          ...assignment.quiz,
+          status: (assignment.quiz.status || 'open') as 'open' | 'closed', // fallback jika status null
+        },
         completion: completionsData?.find(c => c.quiz_id === assignment.quiz_id)
       })) || [];
 
@@ -267,6 +286,10 @@ export function AssignedQuizzes({ onStartQuiz }: AssignedQuizzesProps) {
                         <Badge className={getDifficultyColor(assignment.quiz.difficulty)}>
                           {assignment.quiz.difficulty}
                         </Badge>
+                        {/* Badge status quiz */}
+                        <Badge className={assignment.quiz.status === 'closed' ? 'bg-red-100 text-red-800' : 'bg-green-100 text-green-800'}>
+                          {assignment.quiz.status === 'closed' ? 'Closed' : 'Open'}
+                        </Badge>
                       </div>
                       <CardDescription className="text-sm">
                         {assignment.quiz.description}
@@ -337,15 +360,46 @@ export function AssignedQuizzes({ onStartQuiz }: AssignedQuizzesProps) {
                   ) : (
                     <div className="flex items-center justify-between">
                       <div className="text-sm text-gray-600">
-                        Ready to start this quiz?
+                        {assignment.quiz.status === 'closed' ? (
+                          <span className="text-red-600 font-semibold">Quiz Closed</span>
+                        ) : (
+                          'Ready to start this quiz?'
+                        )}
                       </div>
-                      <Button
-                        onClick={() => onStartQuiz(assignment.quiz.id)}
-                        className="bg-blue-600 hover:bg-blue-700"
-                      >
-                        <PlayCircle className="h-4 w-4 mr-2" />
-                        Start Quiz
-                      </Button>
+                      <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                          <Button
+                            className="bg-blue-600 hover:bg-blue-700"
+                            disabled={assignment.quiz.status === 'closed'}
+                            onClick={() => {
+                              setQuizToStartId(assignment.quiz.id);
+                              setShowConfirmDialog(true);
+                            }}
+                          >
+                            <PlayCircle className="h-4 w-4 mr-2" />
+                            Start Quiz
+                          </Button>
+                        </AlertDialogTrigger>
+                        {showConfirmDialog && quizToStartId === assignment.quiz.id && (
+                          <AlertDialogContent>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>Confirm Quiz Start</AlertDialogTitle>
+                              <AlertDialogDescription>
+                                Are you sure you want to take this quiz? Once you start, you have to finish it.
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel onClick={() => setShowConfirmDialog(false)}>Cancel</AlertDialogCancel>
+                              <AlertDialogAction onClick={() => {
+                                onStartQuiz(assignment.quiz.id);
+                                setShowConfirmDialog(false);
+                              }}>
+                                Start Quiz
+                              </AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        )}
+                      </AlertDialog>
                     </div>
                   )}
                 </CardContent>

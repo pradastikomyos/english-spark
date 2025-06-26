@@ -18,6 +18,8 @@ interface Quiz {
   time_limit: number;
   points_per_question: number;
   questionCount?: number;
+  status: 'open' | 'closed';
+  created_by: string; // Add created_by to Quiz interface
 }
 
 interface Class {
@@ -47,6 +49,8 @@ export function QuizAssignment() {
   const [selectedQuiz, setSelectedQuiz] = useState<Quiz | null>(null);
   const [selectedClasses, setSelectedClasses] = useState<string[]>([]);
   const [dueDays, setDueDays] = useState<string>('7');
+  const [isStatusChangeDialogOpen, setIsStatusChangeDialogOpen] = useState(false);
+  const [quizToChangeStatus, setQuizToChangeStatus] = useState<Quiz | null>(null);
 
   useEffect(() => {
     if (profileId) {
@@ -68,22 +72,16 @@ export function QuizAssignment() {
   const fetchQuizzes = async () => {
     const { data, error } = await supabase
       .from('quizzes')
-      .select('*')
+      .select('*, questions(count), class_quizzes(count)') // Select status and count of assignments
       .eq('created_by', profileId);
 
     if (error) throw error;
 
-    // Get question counts
-    const quizzesWithCounts = await Promise.all(
-      (data || []).map(async (quiz) => {
-        const { count } = await supabase
-          .from('questions')
-          .select('*', { count: 'exact' })
-          .eq('quiz_id', quiz.id);
-        
-        return { ...quiz, questionCount: count || 0 };
-      })
-    );
+    const quizzesWithCounts = (data || []).map((quiz: any) => ({
+      ...quiz,
+      questionCount: quiz.questions?.[0]?.count || 0,
+      status: quiz.status || 'open', // Default to 'open' if not set
+    }));
 
     setQuizzes(quizzesWithCounts);
   };
@@ -114,12 +112,12 @@ export function QuizAssignment() {
       .select(`
         *,
         quiz:quizzes(*),
-        class:classes(*)
+        class:classes(id, name)
       `)
-      .eq('quiz.created_by', profileId);
+      .eq('quiz.created_by', profileId); // Re-add server-side filter
 
     if (error) throw error;
-    setAssignments(data || []);
+    setAssignments(data as Assignment[] || []);
   };
 
   const handleAssignQuiz = async () => {
@@ -134,23 +132,74 @@ export function QuizAssignment() {
 
     try {
       const dueDate = new Date();
-      dueDate.setDate(dueDate.getDate() + parseInt(dueDays));      const assignments = selectedClasses.map(classId => ({
-        quiz_id: selectedQuiz.id,
-        class_id: classId,
-        due_date: dueDate.toISOString(),
-        assigned_at: new Date().toISOString(),
-      }));
+      dueDate.setDate(dueDate.getDate() + parseInt(dueDays));
 
-      const { error } = await supabase
-        .from('class_quizzes')
-        .insert(assignments);
+      const newAssignments = [];
+      const alreadyAssignedClasses: string[] = [];
 
-      if (error) throw error;
+      for (const classId of selectedClasses) {
+        // Check if assignment already exists
+        const { data: existingAssignment, error: checkError } = await supabase
+          .from('class_quizzes')
+          .select('id')
+          .eq('quiz_id', selectedQuiz.id)
+          .eq('class_id', classId)
+          .single();
 
-      toast({
-        title: '🎯 Quiz Assigned Successfully!',
-        description: `"${selectedQuiz.title}" has been assigned to ${selectedClasses.length} class(es)`,
-      });
+        if (checkError && checkError.code !== 'PGRST116') { // PGRST116 means no rows found
+          throw checkError;
+        }
+
+        if (existingAssignment) {
+          alreadyAssignedClasses.push(classes.find(c => c.id === classId)?.name || 'Unknown Class');
+        } else {
+          newAssignments.push({
+            quiz_id: selectedQuiz.id,
+            class_id: classId,
+            due_date: dueDate.toISOString(),
+            assigned_at: new Date().toISOString(),
+          });
+        }
+      }
+
+      if (alreadyAssignedClasses.length > 0) {
+        toast({
+          title: 'Info',
+          description: `Quiz already assigned to: ${alreadyAssignedClasses.join(', ')}`,
+          variant: 'default',
+        });
+      }
+
+      if (newAssignments.length > 0) {
+        console.log('Attempting to insert new assignments:', newAssignments);
+
+        const { error: insertError } = await supabase
+          .from('class_quizzes')
+          .insert(newAssignments);
+
+        if (insertError) {
+          console.error('Supabase insert error:', insertError);
+          throw insertError;
+        }
+
+        toast({
+          title: '🎯 Quiz Assigned Successfully!',
+          description: `"${selectedQuiz.title}" has been assigned to ${newAssignments.length} new class(es)`,
+        });
+      } else if (alreadyAssignedClasses.length > 0) {
+        // If all selected classes were already assigned, still show a success-like message
+        toast({
+          title: 'No New Assignments',
+          description: 'All selected classes were already assigned.',
+          variant: 'default',
+        });
+      } else {
+        toast({
+          title: 'No Classes Selected',
+          description: 'Please select at least one class to assign the quiz.',
+          variant: 'destructive',
+        });
+      }
 
       setIsAssignDialogOpen(false);
       setSelectedQuiz(null);
@@ -160,7 +209,7 @@ export function QuizAssignment() {
       console.error('Assignment error:', error);
       toast({
         title: 'Error',
-        description: 'Failed to assign quiz',
+        description: error.message || 'Failed to assign quiz',
         variant: 'destructive',
       });
     }
@@ -190,6 +239,37 @@ export function QuizAssignment() {
       case 'completed': return 'bg-green-100 text-green-800 border-green-200';
       case 'expired': return 'bg-red-100 text-red-800 border-red-200';
       default: return 'bg-gray-100 text-gray-800 border-gray-200';
+    }
+  };
+
+  const getQuizStatusColor = (status: 'open' | 'closed') => {
+    return status === 'open' ? 'bg-green-100 text-green-800 border-green-200' : 'bg-red-100 text-red-800 border-red-200';
+  };
+
+  const handleChangeQuizStatus = async (quizId: string, newStatus: 'open' | 'closed') => {
+    try {
+      const { error } = await supabase
+        .from('quizzes')
+        .update({ status: newStatus })
+        .eq('id', quizId);
+
+      if (error) throw error;
+
+      toast({
+        title: 'Quiz Status Updated',
+        description: `Quiz status changed to "${newStatus}"`,
+      });
+      setIsStatusChangeDialogOpen(false);
+      setQuizToChangeStatus(null);
+      fetchQuizzes(); // Refresh quizzes to show updated status
+      fetchAssignments(); // Also refresh assignments in case status affects their display
+    } catch (error: any) {
+      console.error('Error updating quiz status:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to update quiz status',
+        variant: 'destructive',
+      });
     }
   };
 
@@ -345,12 +425,51 @@ export function QuizAssignment() {
                       <CardDescription className="mt-1">
                         Assigned to: {assignment.class.name}
                       </CardDescription>
-                    </div>                    <Badge className={getStatusColor(assignment)}>
-                      {getAssignmentStatus(assignment) === 'active' && <AlertCircle className="h-3 w-3 mr-1" />}
-                      {getAssignmentStatus(assignment) === 'completed' && <CheckCircle className="h-3 w-3 mr-1" />}
-                      {getAssignmentStatus(assignment) === 'expired' && <XCircle className="h-3 w-3 mr-1" />}
-                      {getAssignmentStatus(assignment)}
-                    </Badge>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Badge className={getStatusColor(assignment)}>
+                        {getAssignmentStatus(assignment) === 'active' && <AlertCircle className="h-3 w-3 mr-1" />}
+                        {getAssignmentStatus(assignment) === 'completed' && <CheckCircle className="h-3 w-3 mr-1" />}
+                        {getAssignmentStatus(assignment) === 'expired' && <XCircle className="h-3 w-3 mr-1" />}
+                        {getAssignmentStatus(assignment)}
+                      </Badge>
+                      <Dialog open={isStatusChangeDialogOpen && quizToChangeStatus?.id === assignment.quiz.id} onOpenChange={setIsStatusChangeDialogOpen}>
+                        <DialogTrigger asChild>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setQuizToChangeStatus(assignment.quiz)}
+                          >
+                            <Badge className={getQuizStatusColor(assignment.quiz.status)}>
+                              {assignment.quiz.status}
+                            </Badge>
+                          </Button>
+                        </DialogTrigger>
+                        <DialogContent className="max-w-xs">
+                          <DialogHeader>
+                            <DialogTitle>Change Quiz Status</DialogTitle>
+                          </DialogHeader>
+                          <div className="grid gap-4 py-4">
+                            <Select
+                              value={quizToChangeStatus?.status || 'open'}
+                              onValueChange={(value: 'open' | 'closed') => {
+                                if (quizToChangeStatus) {
+                                  handleChangeQuizStatus(quizToChangeStatus.id, value);
+                                }
+                              }}
+                            >
+                              <SelectTrigger>
+                                <SelectValue placeholder="Select status" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="open">Open</SelectItem>
+                                <SelectItem value="closed">Closed</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        </DialogContent>
+                      </Dialog>
+                    </div>
                   </div>
                 </CardHeader>
                 <CardContent>

@@ -18,15 +18,11 @@ interface Question {
   id: string;
   quiz_id: string;
   question_text: string;
-  question_type: 'multiple_choice' | 'true_false' | 'essay';
-  option_a: string;
-  option_b: string;
-  option_c: string;
-  option_d: string;
+  options: Record<string, string>;
   correct_answer: 'A' | 'B' | 'C' | 'D';
   explanation?: string;
   points: number;
-  order_number: number;
+  question_order: number;
   created_at: string;
   difficulty: 'easy' | 'medium' | 'hard'; // Add difficulty to Question interface
 }
@@ -74,11 +70,12 @@ export function QuestionManager({ quizId, quizTitle, onClose, onBack }: Question
         .from('questions')
         .select('*')
         .eq('quiz_id', quizId)
-        .order('order_number', { ascending: true });
+        .order('question_order', { ascending: true });
 
       if (error) throw error;
         console.log('📝 Quiz questions:', data);
-      setQuestions((data || []) as Question[]);
+        console.log('Fetched questions data:', data); // Added console.log statement
+      setQuestions((data || []) as any as Question[]);
     } catch (error: any) {
       console.error('❌ Fetch questions error:', error);
       toast({
@@ -105,27 +102,37 @@ export function QuestionManager({ quizId, quizTitle, onClose, onBack }: Question
     });
   };
 
-  const handleCreateQuestion = async (questionName: string, difficulty: 'easy' | 'medium' | 'hard', points: number) => {
+  const handleCreateQuestion = async (
+    questionName: string,
+    difficulty: 'easy' | 'medium' | 'hard',
+    points: number,
+    options: string[],
+    correctIndex: number
+  ) => {
     try {
-      console.log('📝 Creating question:', questionName, difficulty, points);
+      console.log('📝 Creating question with new format:', { questionName, difficulty, points, options, correctIndex });
       
       const nextOrderNumber = questions.length + 1;
+
+      // Build the new 'options' JSON object
+      const optionsObject = {
+        'A': options[0] || '',
+        'B': options[1] || '',
+        'C': options[2] || '',
+        'D': options[3] || '',
+      };
       
       const { data, error } = await supabase
         .from('questions')
         .insert({
           quiz_id: quizId,
           question_text: questionName,
-          question_type: 'multiple_choice', // Default for now, can be expanded later
-          option_a: '', // These will be added in a separate edit flow
-          option_b: '',
-          option_c: '',
-          option_d: '',
-          correct_answer: 'A', // Default for now
+          options: optionsObject, // Use the new JSON format
+          correct_answer: String.fromCharCode(65 + correctIndex) as 'A' | 'B' | 'C' | 'D',
           explanation: '',
           points: points,
-          order_number: nextOrderNumber,
-          difficulty: difficulty, // Add difficulty here
+          question_order: nextOrderNumber,
+          difficulty: difficulty,
         })
         .select()
         .single();
@@ -159,18 +166,23 @@ export function QuestionManager({ quizId, quizTitle, onClose, onBack }: Question
     try {
       console.log('✏️ Updating question:', currentQuestion.id, questionForm);
       
+      // Build the new 'options' JSON object from the form state
+      const optionsObject = {
+        'A': questionForm.option_a,
+        'B': questionForm.option_b,
+        'C': questionForm.option_c,
+        'D': questionForm.option_d,
+      };
+
       const { data, error } = await supabase
         .from('questions')
         .update({
           question_text: questionForm.question_text,
-          option_a: questionForm.option_a,
-          option_b: questionForm.option_b,
-          option_c: questionForm.option_c,
-          option_d: questionForm.option_d,
+          options: optionsObject, // Use the new JSON format
           correct_answer: questionForm.correct_answer,
           explanation: questionForm.explanation,
           points: questionForm.points,
-          difficulty: questionForm.difficulty, // Update difficulty here
+          difficulty: questionForm.difficulty,
         })
         .eq('id', currentQuestion.id)
         .select()
@@ -234,16 +246,17 @@ export function QuestionManager({ quizId, quizTitle, onClose, onBack }: Question
  
   const openEditDialog = (question: Question) => {
     setCurrentQuestion(question);
+    // Populate form from the 'options' object for consistency
     setQuestionForm({
       question_text: question.question_text,
-      option_a: question.option_a,
-      option_b: question.option_b,
-      option_c: question.option_c,
-      option_d: question.option_d,
+      option_a: question.options?.A || '',
+      option_b: question.options?.B || '',
+      option_c: question.options?.C || '',
+      option_d: question.options?.D || '',
       correct_answer: question.correct_answer,
       explanation: question.explanation || '',
       points: question.points,
-      difficulty: question.difficulty, // Set difficulty here
+      difficulty: question.difficulty,
     });
     setIsEditDialogOpen(true);
   };
@@ -286,7 +299,9 @@ export function QuestionManager({ quizId, quizTitle, onClose, onBack }: Question
             <CreateQuestionForm
               isOpen={isCreateQuestionDialogOpen}
               onClose={() => setIsCreateQuestionDialogOpen(false)}
-              onCreateQuestion={handleCreateQuestion}
+              onCreateQuestion={(questionName, difficulty, points, options, correctIndex) =>
+                handleCreateQuestion(questionName, difficulty, points, options, correctIndex)
+              }
             />
           </Dialog>
           
@@ -326,22 +341,18 @@ export function QuestionManager({ quizId, quizTitle, onClose, onBack }: Question
                   <h3 className="font-semibold text-lg mb-3">{question.question_text}</h3>
                   
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                    <div className={`p-2 rounded border ${getDifficultyColor('A', question.correct_answer)}`}>
-                      <span className="font-medium">A. </span>{question.option_a}
-                      {question.correct_answer === 'A' && <CheckCircle className="w-4 h-4 inline ml-2 text-green-600" />}
-                    </div>
-                    <div className={`p-2 rounded border ${getDifficultyColor('B', question.correct_answer)}`}>
-                      <span className="font-medium">B. </span>{question.option_b}
-                      {question.correct_answer === 'B' && <CheckCircle className="w-4 h-4 inline ml-2 text-green-600" />}
-                    </div>
-                    <div className={`p-2 rounded border ${getDifficultyColor('C', question.correct_answer)}`}>
-                      <span className="font-medium">C. </span>{question.option_c}
-                      {question.correct_answer === 'C' && <CheckCircle className="w-4 h-4 inline ml-2 text-green-600" />}
-                    </div>
-                    <div className={`p-2 rounded border ${getDifficultyColor('D', question.correct_answer)}`}>
-                      <span className="font-medium">D. </span>{question.option_d}
-                      {question.correct_answer === 'D' && <CheckCircle className="w-4 h-4 inline ml-2 text-green-600" />}
-                    </div>
+                    {question.options && Object.keys(question.options).length > 0 && Object.values(question.options).some(v => v) ? (
+                      Object.entries(question.options).map(([key, value]) => (
+                        <div key={key} className={`p-2 rounded border ${getDifficultyColor(key, question.correct_answer)}`}>
+                          <span className="font-medium">{key}. </span>{value}
+                          {question.correct_answer === key && <CheckCircle className="w-4 h-4 inline ml-2 text-green-600" />}
+                        </div>
+                      ))
+                    ) : (
+                      <div className="col-span-1 md:col-span-2 text-sm text-muted-foreground italic p-2 bg-gray-50 rounded-md">
+                        Pilihan jawaban tidak tersedia untuk soal ini. Silakan klik tombol 'Edit' untuk menambahkan pilihan jawaban.
+                      </div>
+                    )}
                   </div>
                   
                   {question.explanation && (

@@ -1,9 +1,33 @@
 # CHANGELOG - Loveable English Spark 🚀
 
+## [2025-06-24] - Sidebar Responsiveness & Gamification Logic Update 🚀
+
+### 🚀 **FEATURE ENHANCEMENT**: RESPONSIVE SIDEBAR
+- **✅ Student Portal Sidebar**:
+  - Implemented proper state management (`sidebarOpen`, `setSidebarOpen`) in `StudentPortal.tsx`.
+  - Sidebar now defaults to closed on desktop view, preventing content overlap.
+  - Added toggle button for mobile view to open/close sidebar.
+  - Auto-closes sidebar on page navigation in mobile view using `useIsMobile` hook.
+  - Ensured sidebar does not overlap main content on desktop.
+  - Verified existing overlay/backdrop for mobile view.
+- **✅ Teacher Portal Sidebar**:
+  - Applied consistent state management and responsive behavior to `TeacherLayout.tsx` and `TeacherPortal.tsx`.
+  - Ensures consistent sidebar behavior across both student and teacher portals.
+
+### 🎮 **GAMIFICATION LOGIC UPDATE**:
+- **Points System Adjustment**:
+  - Quiz 1: 30 questions, 100 points
+  - Quiz 2: 30 questions, 100 points
+  - Quiz 3: 30 questions, 100 points
+  - Quiz 4: 60 questions, 200 points
+  - This update reflects the new point distribution for quizzes.
+
+---
+
 ## [2025-06-22] - 🎯 **100% MVP COMPLETE!** GANBARIMASU ACHIEVED! 🔥🏆
 
 ### 🚀 **MILESTONE REACHED**: LEADERBOARD SYSTEM & STUDY MATERIALS COMPLETE!
-- **✅ LEADERBOARD SYSTEM**: 
+- **✅ LEADERBOARD SYSTEM**:
   - Complete ranking system showing students by points, level, and streak
   - Class vs School leaderboard views with toggle buttons
   - Beautiful rank indicators (Crown for #1, Medals for #2-3, Trophy for others)
@@ -27,7 +51,7 @@
 - **Icon System**: Trophy for leaderboard, BookOpen for study materials
 - **UI Consistency**: Matching design patterns across all student components
 
-### 🏆 **MVP STATUS: 100% COMPLETE!** 
+### 🏆 **MVP STATUS: 100% COMPLETE!**
 **Teacher Portal**: ✅ CRUD Quiz, Questions, Students, Classes, Assignment System
 **Student Portal**: ✅ Login, Dashboard, Assigned Quizzes, Quiz Taking, Results, Achievements, **LEADERBOARD**, **STUDY MATERIALS**
 **Assignment System**: ✅ Teacher assign → Student view → Student complete → Progress tracked
@@ -35,7 +59,7 @@
 ### 📱 **FINAL FEATURE SET**
 **Student Features Complete:**
 - ✅ Student Dashboard (enhanced with comprehensive stats)
-- ✅ Assigned Quizzes (teacher assignment integration) 
+- ✅ Assigned Quizzes (teacher assignment integration)
 - ✅ Quiz Taking Interface (full interactive experience with timer)
 - ✅ Quiz Results & Analytics (achievements, progress tracking)
 - ✅ **Leaderboard System** (class/school rankings with gamification)
@@ -71,7 +95,7 @@
 ## [2025-06-21] - ASSIGNMENT INTEGRATION: MVP COMPLETE! 🎯🔥
 
 ### 🚀 **MAJOR FEATURE**: ASSIGNMENT INTEGRATION SYSTEM
-- **✅ ASSIGNED QUIZZES COMPONENT**: 
+- **✅ ASSIGNED QUIZZES COMPONENT**:
   - Students can view all quizzes assigned by their teacher
   - Real-time assignment status: Pending, Completed, Overdue
   - Due date tracking with countdown timers
@@ -92,7 +116,7 @@
   - Quiz completion → Progress tracked in user_progress table
   - Results viewable in QuizResults component
 
-### 🎯 **MVP STATUS: 95% COMPLETE!** 
+### 🎯 **MVP STATUS: 95% COMPLETE!**
 **Teacher Portal**: ✅ CRUD Quiz, Questions, Students, Classes, Assignment System
 **Student Portal**: ✅ Login, Dashboard, Assigned Quizzes, Quiz Taking, Results, Achievements
 **Assignment System**: ✅ Teacher assign → Student view → Student complete → Progress tracked
@@ -117,7 +141,7 @@
 ## [2025-06-21] - CRITICAL FIXES: Auth Flow & Student Creation Performance ⚡
 
 ### 🚨 CRITICAL BUGS FIXED
-- **✅ STUDENT CREATION SYSTEM FIXED**: 
+- **✅ STUDENT CREATION SYSTEM FIXED**:
   - Teachers can now successfully add students via portal
   - Auto-creation of auth users when teacher adds student
   - Password system working (default: student123)
@@ -179,7 +203,7 @@
 ## [2025-06-21] - STUDENT PORTAL: Quiz Taking & Results System ✅
 
 ### 🎯 COMPLETED - Student Role Core Features
-- **✅ QUIZ TAKING INTERFACE**: 
+- **✅ QUIZ TAKING INTERFACE**:
   - Complete `QuizTaking.tsx` component with interactive experience
   - Timer system with auto-submit when time runs out
   - Question navigation with overview grid
@@ -235,7 +259,7 @@
 ## [2025-06-21] - TEACHER ROLE COMPLETION: Quiz Assignment System ✅
 
 ### 🎯 COMPLETED - Teacher Role Features
-- **✅ QUIZ ASSIGNMENT SYSTEM**: 
+- **✅ QUIZ ASSIGNMENT SYSTEM**:
   - New `QuizAssignment.tsx` component for assigning quizzes to classes
   - Teachers can select quiz → select multiple classes → set due dates
   - Visual assignment cards showing status (active/completed/expired)
@@ -282,7 +306,7 @@
 ## [2024-12-28] - MAJOR FIX: Duplikasi Function & UI Template Quiz Polish ✅
 
 ### 🛠️ FIXED - Critical Error Resolution
-- **✅ DUPLIKASI FUNCTION RESOLVED**: 
+- **✅ DUPLIKASI FUNCTION RESOLVED**:
   - Menghapus duplikasi function `resetForm`, `formatTime`, `getDifficultyIcon` di QuizManagement.tsx
   - Membuat file QuizManagement_clean.tsx yang 100% bersih tanpa duplikasi
   - Mengganti file lama dengan versi bersih
@@ -299,7 +323,7 @@
 - **🎯 IMPROVED TEMPLATE FEATURES**:
   - Quick Templates section dengan 3 template siap pakai:
     1. "Greeting Basics" (Easy, 5m, Communication)
-    2. "Daily Vocabulary" (Medium, 10m, Vocabulary) 
+    2. "Daily Vocabulary" (Medium, 10m, Vocabulary)
     3. "Business English" (Hard, 15m, Professional)
   - Template cards dengan hover effects dan visual indicators
   - Auto-fill form saat template dipilih
@@ -321,7 +345,7 @@
 
 ### 📋 NEXT PRIORITIES
 1. **End-to-end Testing**: Guru create quiz → add questions → test flow
-2. **Assignment System**: Assign quiz ke kelas tertentu  
+2. **Assignment System**: Assign quiz ke kelas tertentu
 3. **Student Portal**: Siswa login → take quiz → scoring
 4. **Advanced Features**: Preview quiz, bulk import, export
 
@@ -336,7 +360,7 @@
 - **❓ CRUD Questions**: Per-quiz question management (QuestionManager.tsx)
 - **🎨 UI Components**: Responsive cards, dialogs, forms dengan shadcn/ui
 
-### 🔗 INTEGRATION STATUS  
+### 🔗 INTEGRATION STATUS
 - ✅ Supabase connection & schema imported
 - ✅ Authentication system working
 - ✅ Database tables: students, quizzes, questions

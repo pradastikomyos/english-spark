@@ -28,19 +28,22 @@ interface Quiz {
   difficulty: 'easy' | 'medium' | 'hard';
   time_limit: number;
   points_per_question: number;
+  status: 'open' | 'closed'; // Add status to Quiz interface
 }
 
 interface Question {
   id: string;
   question_text: string;
-  option_a: string;
-  option_b: string;
-  option_c: string;
-  option_d: string;
+  options?: Record<string, string>; // Modern format
+  option_a?: string; // Legacy format
+  option_b?: string; // Legacy format
+  option_c?: string; // Legacy format
+  option_d?: string; // Legacy format
   correct_answer: string;
   explanation?: string;
   points: number;
-  order_number?: number;
+  difficulty: 'easy' | 'medium' | 'hard';
+  question_order?: number;
 }
 
 interface QuizTakingProps {
@@ -62,6 +65,8 @@ export function QuizTaking({ quizId, onComplete, onBack }: QuizTakingProps): JSX
   const [score, setScore] = useState(0);
   const [loading, setLoading] = useState(true);
   const [showResults, setShowResults] = useState(false);
+  const [totalPoints, setTotalPoints] = useState(0);
+  const [pointsByDifficulty, setPointsByDifficulty] = useState({ easy: 0, medium: 0, hard: 0 });
 
   useEffect(() => {
     fetchQuizData();
@@ -90,23 +95,34 @@ export function QuizTaking({ quizId, onComplete, onBack }: QuizTakingProps): JSX
       // Fetch quiz details
       const { data: quizData, error: quizError } = await supabase
         .from('quizzes')
-        .select('*')
+        .select('*, status') // Explicitly select status
         .eq('id', quizId)
         .single();
 
       if (quizError) throw quizError;
+
+      if (quizData.status === 'closed') {
+        toast({
+          title: 'Quiz Closed',
+          description: 'This quiz is currently closed and cannot be taken.',
+          variant: 'destructive',
+        });
+        setLoading(false);
+        onBack(); // Go back to the previous page
+        return;
+      }
 
       // Fetch questions
       const { data: questionsData, error: questionsError } = await supabase
         .from('questions')
         .select('*')
         .eq('quiz_id', quizId)
-        .order('order_number', { ascending: true });
+        .order('question_order', { ascending: true });
 
       if (questionsError) throw questionsError;
 
-      setQuiz(quizData);
-      setQuestions(questionsData || []);
+      setQuiz(quizData as Quiz);
+      setQuestions((questionsData as unknown as Question[]) || []);
       setTimeLeft(quizData.time_limit);
     } catch (error: any) {
       console.error('Error fetching quiz:', error);
@@ -156,26 +172,29 @@ export function QuizTaking({ quizId, onComplete, onBack }: QuizTakingProps): JSX
     try {
       setIsCompleted(true);
       
-      // Calculate score
       let correctAnswers = 0;
-      const results = questions.map(question => {
+      const pointsBreakdown = { easy: 0, medium: 0, hard: 0 };
+      let totalPointsEarned = 0;
+
+      questions.forEach(question => {
         const userAnswer = answers[question.id];
         const isCorrect = userAnswer === question.correct_answer;
-        if (isCorrect) correctAnswers++;
-        
-        return {
-          questionId: question.id,
-          userAnswer,
-          correctAnswer: question.correct_answer,
-          isCorrect,
-          points: isCorrect ? question.points : 0,
-        };
+        if (isCorrect) {
+          correctAnswers++;
+          const points = question.points;
+          const difficulty = question.difficulty;
+          totalPointsEarned += points;
+          if (pointsBreakdown.hasOwnProperty(difficulty)) {
+            pointsBreakdown[difficulty] += points;
+          }
+        }
       });
 
-      const totalScore = (correctAnswers / questions.length) * 100;
-      const totalPoints = results.reduce((sum, r) => sum + r.points, 0);
+      const totalScore = questions.length > 0 ? Math.round((correctAnswers / questions.length) * 100) : 0;
       
       setScore(totalScore);
+      setTotalPoints(totalPointsEarned);
+      setPointsByDifficulty(pointsBreakdown);
 
       // Save to database
       const { error } = await supabase
@@ -186,7 +205,6 @@ export function QuizTaking({ quizId, onComplete, onBack }: QuizTakingProps): JSX
           score: totalScore,
           total_questions: questions.length,
           time_taken: quiz!.time_limit - timeLeft,
-          completed_at: new Date().toISOString(),
         });
 
       if (error) throw error;
@@ -199,7 +217,7 @@ export function QuizTaking({ quizId, onComplete, onBack }: QuizTakingProps): JSX
         .single();
 
       if (student) {
-        const newTotalPoints = (student.total_points || 0) + totalPoints;
+        const newTotalPoints = (student.total_points || 0) + totalPointsEarned;
         const newLevel = Math.floor(newTotalPoints / 100) + 1;
 
         await supabase
@@ -215,7 +233,7 @@ export function QuizTaking({ quizId, onComplete, onBack }: QuizTakingProps): JSX
       
       toast({
         title: '🎉 Quiz Completed!',
-        description: `You scored ${totalScore.toFixed(0)}% and earned ${totalPoints} points!`,
+        description: `You scored ${totalScore.toFixed(0)}% and earned ${totalPointsEarned} points!`,
       });
 
     } catch (error: any) {
@@ -322,6 +340,42 @@ export function QuizTaking({ quizId, onComplete, onBack }: QuizTakingProps): JSX
           </Card>
         </div>
 
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg flex items-center gap-2">
+              <Trophy className="h-5 w-5 text-yellow-500" />
+              Points Breakdown
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3 text-sm">
+            <div className="flex justify-between items-center">
+              <span className="flex items-center gap-2 text-gray-600">
+                <Badge className={getDifficultyColor('easy')}>Easy</Badge>
+                <span>Points Earned</span>
+              </span>
+              <span className="font-semibold text-green-600">{pointsByDifficulty.easy}</span>
+            </div>
+            <div className="flex justify-between items-center">
+              <span className="flex items-center gap-2 text-gray-600">
+                <Badge className={getDifficultyColor('medium')}>Medium</Badge>
+                <span>Points Earned</span>
+              </span>
+              <span className="font-semibold text-yellow-600">{pointsByDifficulty.medium}</span>
+            </div>
+            <div className="flex justify-between items-center">
+              <span className="flex items-center gap-2 text-gray-600">
+                <Badge className={getDifficultyColor('hard')}>Hard</Badge>
+                <span>Points Earned</span>
+              </span>
+              <span className="font-semibold text-red-600">{pointsByDifficulty.hard}</span>
+            </div>
+            <div className="border-t pt-3 mt-3 flex justify-between items-center">
+              <span className="font-bold text-gray-800">Total Points Earned</span>
+              <span className="font-bold text-xl text-blue-600">{totalPoints}</span>
+            </div>
+          </CardContent>
+        </Card>
+
         <div className="flex justify-center gap-4">
           <Button onClick={onBack} variant="outline">
             Back to Dashboard
@@ -416,6 +470,9 @@ export function QuizTaking({ quizId, onComplete, onBack }: QuizTakingProps): JSX
               <CardTitle className="flex items-center gap-2">
                 <Target className="h-5 w-5" />
                 {quiz.title}
+                <Badge className={`${getDifficultyColor(currentQuestion.difficulty)} ml-2`}>
+                  {currentQuestion.difficulty} ({currentQuestion.points} points)
+                </Badge>
               </CardTitle>
               <CardDescription>
                 Question {currentQuestionIndex + 1} of {questions.length}
@@ -450,23 +507,36 @@ export function QuizTaking({ quizId, onComplete, onBack }: QuizTakingProps): JSX
             onValueChange={(value) => handleAnswerSelect(currentQuestion.id, value)}
             className="space-y-4"
           >
-            {[
-              { value: 'A', text: currentQuestion.option_a },
-              { value: 'B', text: currentQuestion.option_b },
-              { value: 'C', text: currentQuestion.option_c },
-              { value: 'D', text: currentQuestion.option_d },
-            ].map((option) => (
-              <div key={option.value} className="flex items-center space-x-2">
-                <RadioGroupItem value={option.value} id={option.value} />
-                <Label 
-                  htmlFor={option.value} 
-                  className="flex-1 cursor-pointer p-3 rounded-lg border hover:bg-gray-50"
-                >
-                  <span className="font-medium mr-2">{option.value}.</span>
-                  {option.text}
-                </Label>
-              </div>
-            ))}
+            {currentQuestion.options && Object.keys(currentQuestion.options).length > 0 ? (
+              // New format: Render from 'options' JSON
+              Object.entries(currentQuestion.options).map(([key, value]) => (
+                <div key={key} className="flex items-center space-x-2">
+                  <RadioGroupItem value={key} id={`${currentQuestion.id}-${key}`} />
+                  <Label htmlFor={`${currentQuestion.id}-${key}`} className="flex-1 cursor-pointer p-3 rounded-lg border hover:bg-gray-50">
+                    <span className="font-medium mr-2">{key}.</span>
+                    {value}
+                  </Label>
+                </div>
+              ))
+            ) : (
+              // Old format: Render from separate option fields
+              [
+                { value: 'A', text: currentQuestion.option_a },
+                { value: 'B', text: currentQuestion.option_b },
+                { value: 'C', text: currentQuestion.option_c },
+                { value: 'D', text: currentQuestion.option_d },
+              ].map((option) => (
+                option.text && (
+                  <div key={option.value} className="flex items-center space-x-2">
+                    <RadioGroupItem value={option.value} id={`${currentQuestion.id}-${option.value}`} />
+                    <Label htmlFor={`${currentQuestion.id}-${option.value}`} className="flex-1 cursor-pointer p-3 rounded-lg border hover:bg-gray-50">
+                      <span className="font-medium mr-2">{option.value}.</span>
+                      {option.text}
+                    </Label>
+                  </div>
+                )
+              ))
+            )}
           </RadioGroup>
         </CardContent>
       </Card>

@@ -15,17 +15,21 @@ import {
   PlayCircle,
   Trophy
 } from 'lucide-react';
+import { ThemeToggle } from '@/components/theme-toggle';
 import { cn } from '@/lib/utils';
 
 interface StudentLayoutProps {
   children: React.ReactNode;
   currentPage: string;
   onPageChange: (page: string) => void;
+  sidebarOpen: boolean;
+  setSidebarOpen: (open: boolean) => void;
+  isTakingQuiz: boolean;
 }
 
-export function StudentLayout({ children, currentPage, onPageChange }: StudentLayoutProps) {
+export function StudentLayout({ children, currentPage, onPageChange, sidebarOpen, setSidebarOpen, isTakingQuiz }: StudentLayoutProps) {
   const { signOut } = useAuth();
-  const [sidebarOpen, setSidebarOpen] = useState(false);  const navigation = [
+  const navigation = [
     { name: 'Dashboard', id: 'dashboard', icon: Home },
     { name: 'Assigned Quizzes', id: 'assigned', icon: ClipboardList },
     { name: 'Quiz Results', id: 'results', icon: BarChart3 },
@@ -36,7 +40,7 @@ export function StudentLayout({ children, currentPage, onPageChange }: StudentLa
   ];
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-green-50">
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-green-50 dark:from-slate-900 dark:to-gray-900 flex">
       {/* Mobile sidebar backdrop */}
       {sidebarOpen && (
         <div
@@ -48,7 +52,7 @@ export function StudentLayout({ children, currentPage, onPageChange }: StudentLa
       {/* Sidebar */}
       <div
         className={cn(
-          'fixed inset-y-0 left-0 z-50 w-64 bg-white shadow-lg transform transition-transform duration-300 ease-in-out lg:translate-x-0 lg:static lg:inset-0',
+          'fixed inset-y-0 left-0 z-50 w-64 bg-card shadow-lg transform transition-transform duration-300 ease-in-out lg:translate-x-0 lg:static lg:inset-0',
           sidebarOpen ? 'translate-x-0' : '-translate-x-full'
         )}
       >
@@ -99,6 +103,7 @@ export function StudentLayout({ children, currentPage, onPageChange }: StudentLa
               variant="ghost"
               onClick={signOut}
               className="w-full justify-start text-red-600 hover:text-red-700 hover:bg-red-50"
+              disabled={isTakingQuiz}
             >
               <LogOut className="h-5 w-5 mr-3" />
               Sign Out
@@ -108,9 +113,9 @@ export function StudentLayout({ children, currentPage, onPageChange }: StudentLa
       </div>
 
       {/* Main content */}
-      <div className="lg:pl-64">
+      <div className="flex-1 flex flex-col">
         {/* Top bar */}
-        <div className="sticky top-0 z-10 bg-white/80 backdrop-blur-sm shadow-sm border-b border-gray-200">
+        <div className="sticky top-0 z-10 bg-background/80 backdrop-blur-sm shadow-sm border-b border-border">
           <div className="flex items-center justify-between h-16 px-6">
             <Button
               variant="ghost"
@@ -120,16 +125,15 @@ export function StudentLayout({ children, currentPage, onPageChange }: StudentLa
             >
               <Menu className="h-5 w-5" />
             </Button>
+            <div className="flex-1"></div>
             <div className="flex items-center gap-4">
-              <h2 className="text-lg font-semibold text-gray-900 capitalize">
-                {currentPage}
-              </h2>
+              <ThemeToggle />
             </div>
           </div>
         </div>
 
         {/* Page content */}
-        <main className="p-6">
+        <main className="p-6 flex-1">
           {children}
         </main>
       </div>

@@ -55,22 +55,22 @@
 
   .dark {
     --background: 222.2 84% 4.9%;
-    --foreground: 210 40% 98%;
+    --foreground: 210 20% 90%; /* Slightly darker white for main text */
 
     --card: 222.2 84% 4.9%;
-    --card-foreground: 210 40% 98%;
+    --card-foreground: 210 20% 90%; /* Slightly darker white for card text */
 
     --popover: 222.2 84% 4.9%;
-    --popover-foreground: 210 40% 98%;
+    --popover-foreground: 210 20% 90%; /* Slightly darker white for popover text */
 
     --primary: 210 40% 98%;
     --primary-foreground: 222.2 47.4% 11.2%;
 
     --secondary: 217.2 32.6% 17.5%;
-    --secondary-foreground: 210 40% 98%;
+    --secondary-foreground: 210 20% 90%; /* Slightly darker white for secondary text */
 
     --muted: 217.2 32.6% 17.5%;
-    --muted-foreground: 215 20.2% 65.1%;
+    --muted-foreground: 215 15% 75%; /* Slightly lighter gray for muted text */
 
     --accent: 217.2 32.6% 17.5%;
     --accent-foreground: 210 40% 98%;

@@ -8,7 +8,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
-import { BookOpen, Users, GraduationCap } from 'lucide-react';
+import { Users, GraduationCap } from 'lucide-react';
+import mascotImage from '../../../maskot/maskot.png';
 
 type UserRole = 'student' | 'teacher';
 
@@ -86,15 +87,15 @@ export function AuthForm() {
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
           <div className="flex justify-center mb-4">
-            <div className="bg-blue-600 p-3 rounded-full">
-              <BookOpen className="h-8 w-8 text-white" />
+            <div className="p-3 flex items-center justify-center">
+              <img src={mascotImage} alt="Mascot" className="h-32 w-32" />
             </div>
           </div>
           <CardTitle className="text-2xl font-bold text-gray-900">
             English Learning Platform
           </CardTitle>
           <CardDescription>
-            Gamified learning for SMK students and teachers
+            Gamified learning for SMK Wiworotomo
           </CardDescription>
         </CardHeader>
         <CardContent>
