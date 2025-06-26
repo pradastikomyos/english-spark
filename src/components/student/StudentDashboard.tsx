@@ -388,9 +388,6 @@ export function StudentDashboard({ onStartQuiz }: StudentDashboardProps) {
                               }`}>
                                 {assignment.completed ? 'Completed' : isOverdue ? 'Overdue' : 'Pending'}
                               </Badge>
-                              <Badge variant="outline" className="text-xs">
-                                {assignment.quiz.difficulty}
-                              </Badge>
                               {assignment.due_date && !assignment.completed && (
                                 <span className={`text-xs ${isOverdue ? 'text-red-600' : ''}`}>
                                   {isOverdue 
@@ -450,9 +447,6 @@ export function StudentDashboard({ onStartQuiz }: StudentDashboardProps) {
                         <div>
                           <h3 className="font-medium">{quiz.quizzes?.title}</h3>
                           <div className="flex items-center gap-2 text-sm text-gray-600">
-                            <Badge variant="outline" className="text-xs">
-                              {quiz.quizzes?.difficulty}
-                            </Badge>
                             <span className="flex items-center gap-1">
                               <Clock className="h-3 w-3" />
                               {Math.floor((quiz.quizzes?.time_limit || 0) / 60)}min

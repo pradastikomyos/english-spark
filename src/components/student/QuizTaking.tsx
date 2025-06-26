@@ -399,9 +399,6 @@ export function QuizTaking({ quizId, onComplete, onBack }: QuizTakingProps): JSX
                 <CardTitle className="text-2xl">{quiz.title}</CardTitle>
                 <CardDescription className="mt-2">{quiz.description}</CardDescription>
               </div>
-              <Badge className={getDifficultyColor(quiz.difficulty)}>
-                {quiz.difficulty}
-              </Badge>
             </div>
           </CardHeader>
           <CardContent>
@@ -442,14 +439,14 @@ export function QuizTaking({ quizId, onComplete, onBack }: QuizTakingProps): JSX
             </div>
 
             <div className="flex justify-between">
-              <Button variant="outline" onClick={onBack}>
+            <Button variant="outline" onClick={onBack} className="px-6 py-3 text-base">
                 <ArrowLeft className="h-4 w-4 mr-2" />
                 Go Back
-              </Button>
-              <Button onClick={startQuiz} className="bg-green-600 hover:bg-green-700">
+            </Button>
+            <Button onClick={startQuiz} className="bg-green-600 hover:bg-green-700 px-6 py-3 text-base">
                 <Timer className="h-4 w-4 mr-2" />
                 Start Quiz
-              </Button>
+            </Button>
             </div>
           </CardContent>
         </Card>
@@ -467,21 +464,21 @@ export function QuizTaking({ quizId, onComplete, onBack }: QuizTakingProps): JSX
         <CardHeader>
           <div className="flex items-center justify-between">
             <div>
-              <CardTitle className="flex items-center gap-2">
-                <Target className="h-5 w-5" />
-                {quiz.title}
-                <Badge className={`${getDifficultyColor(currentQuestion.difficulty)} ml-2`}>
-                  {currentQuestion.difficulty} ({currentQuestion.points} points)
-                </Badge>
-              </CardTitle>
+          <CardTitle className="flex items-center gap-2">
+            <Target className="h-5 w-5" />
+            {quiz.title}
+            <Badge className={`${getDifficultyColor(currentQuestion.difficulty)} ml-2`}>
+              {currentQuestion.difficulty} ({currentQuestion.points} points)
+            </Badge>
+          </CardTitle>
               <CardDescription>
                 Question {currentQuestionIndex + 1} of {questions.length}
               </CardDescription>
             </div>
             <div className="text-right">
-              <div className="flex items-center gap-2 mb-1">
-                <Clock className={`h-5 w-5 ${timeLeft < 60 ? 'text-red-500' : 'text-blue-500'}`} />
-                <span className={`text-lg font-bold ${timeLeft < 60 ? 'text-red-500' : 'text-blue-600'}`}>
+              <div className="flex items-center justify-end gap-2 mb-1">
+                <Clock className={`h-6 w-6 ${timeLeft < 60 ? 'text-red-500' : 'text-blue-500'}`} />
+                <span className={`text-xl font-bold ${timeLeft < 60 ? 'text-red-500' : 'text-blue-600'}`}>
                   {formatTime(timeLeft)}
                 </span>
               </div>
@@ -490,7 +487,7 @@ export function QuizTaking({ quizId, onComplete, onBack }: QuizTakingProps): JSX
               </p>
             </div>
           </div>
-          <Progress value={getProgressPercentage()} className="h-2" />
+          <Progress value={getProgressPercentage()} className="h-3 mt-4" />
         </CardHeader>
       </Card>
 
@@ -510,10 +507,10 @@ export function QuizTaking({ quizId, onComplete, onBack }: QuizTakingProps): JSX
             {currentQuestion.options && Object.keys(currentQuestion.options).length > 0 ? (
               // New format: Render from 'options' JSON
               Object.entries(currentQuestion.options).map(([key, value]) => (
-                <div key={key} className="flex items-center space-x-2">
-                  <RadioGroupItem value={key} id={`${currentQuestion.id}-${key}`} />
-                  <Label htmlFor={`${currentQuestion.id}-${key}`} className="flex-1 cursor-pointer p-3 rounded-lg border hover:bg-gray-50">
-                    <span className="font-medium mr-2">{key}.</span>
+                <div key={key} className="flex items-center space-x-3">
+                  <RadioGroupItem value={key} id={`${currentQuestion.id}-${key}`} className="h-5 w-5" />
+                  <Label htmlFor={`${currentQuestion.id}-${key}`} className="flex-1 cursor-pointer p-4 rounded-lg border text-lg hover:bg-gray-50 transition-colors">
+                    <span className="font-semibold mr-2">{key}.</span>
                     {value}
                   </Label>
                 </div>
@@ -527,10 +524,10 @@ export function QuizTaking({ quizId, onComplete, onBack }: QuizTakingProps): JSX
                 { value: 'D', text: currentQuestion.option_d },
               ].map((option) => (
                 option.text && (
-                  <div key={option.value} className="flex items-center space-x-2">
-                    <RadioGroupItem value={option.value} id={`${currentQuestion.id}-${option.value}`} />
-                    <Label htmlFor={`${currentQuestion.id}-${option.value}`} className="flex-1 cursor-pointer p-3 rounded-lg border hover:bg-gray-50">
-                      <span className="font-medium mr-2">{option.value}.</span>
+                  <div key={option.value} className="flex items-center space-x-3">
+                    <RadioGroupItem value={option.value} id={`${currentQuestion.id}-${option.value}`} className="h-5 w-5" />
+                    <Label htmlFor={`${currentQuestion.id}-${option.value}`} className="flex-1 cursor-pointer p-4 rounded-lg border text-lg hover:bg-gray-50 transition-colors">
+                      <span className="font-semibold mr-2">{option.value}.</span>
                       {option.text}
                     </Label>
                   </div>
@@ -547,6 +544,7 @@ export function QuizTaking({ quizId, onComplete, onBack }: QuizTakingProps): JSX
           variant="outline"
           onClick={() => navigateQuestion('prev')}
           disabled={currentQuestionIndex === 0}
+          className="px-6 py-3 text-base"
         >
           <ArrowLeft className="h-4 w-4 mr-2" />
           Previous
@@ -556,7 +554,7 @@ export function QuizTaking({ quizId, onComplete, onBack }: QuizTakingProps): JSX
           {currentQuestionIndex === questions.length - 1 ? (
             <Button 
               onClick={submitQuiz}
-              className="bg-green-600 hover:bg-green-700"
+              className="bg-green-600 hover:bg-green-700 px-6 py-3 text-base"
               disabled={getAnsweredCount() === 0}
             >
               <CheckCircle className="h-4 w-4 mr-2" />
@@ -566,6 +564,7 @@ export function QuizTaking({ quizId, onComplete, onBack }: QuizTakingProps): JSX
             <Button
               onClick={() => navigateQuestion('next')}
               disabled={currentQuestionIndex === questions.length - 1}
+              className="px-6 py-3 text-base"
             >
               Next
               <ArrowRight className="h-4 w-4 ml-2" />
@@ -576,22 +575,23 @@ export function QuizTaking({ quizId, onComplete, onBack }: QuizTakingProps): JSX
 
       {/* Question Overview */}
       <Card>
-        <CardHeader>
-          <CardTitle className="text-sm">Question Overview</CardTitle>
+        <CardHeader className="px-4 py-2"> {/* Adjusted padding */}
+          <CardTitle className="text-base">Question Overview</CardTitle> {/* Increased font size */}
         </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-5 md:grid-cols-10 gap-2">
+        <CardContent className="px-4 pt-2"> {/* Adjusted padding */}
+          <div className="flex flex-wrap gap-2">
             {questions.map((_, index) => (
               <button
                 key={index}
                 onClick={() => setCurrentQuestionIndex(index)}
-                className={`w-8 h-8 rounded text-sm font-medium transition-colors ${
-                  index === currentQuestionIndex
-                    ? 'bg-blue-600 text-white'
-                    : answers[questions[index].id]
-                    ? 'bg-green-100 text-green-800 border border-green-300'
-                    : 'bg-gray-100 text-gray-600 border border-gray-300'
-                }`}
+                className={`w-9 h-9 rounded-lg text-base font-semibold transition-colors flex items-center justify-center
+                  ${
+                    index === currentQuestionIndex
+                      ? 'bg-blue-600 text-white shadow-lg'
+                      : answers[questions[index].id]
+                      ? 'bg-green-100 text-green-800 border border-green-300 hover:bg-green-200'
+                      : 'bg-gray-100 text-gray-700 border border-gray-300 hover:bg-gray-200'
+                  }`}
               >
                 {index + 1}
               </button>

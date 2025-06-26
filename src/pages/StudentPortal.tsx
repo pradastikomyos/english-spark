@@ -8,6 +8,7 @@ import { QuizTaking } from '@/components/student/QuizTaking';
 import { Leaderboard } from '@/components/student/Leaderboard';
 import { StudyMaterials } from '@/components/student/StudyMaterials';
 import { Achievements } from '@/components/student/Achievements';
+import Profile from '@/components/student/Profile';
 import { useToast } from '@/hooks/use-toast';
 import { useIsMobile } from '@/hooks/use-mobile';
 
@@ -78,7 +79,7 @@ export default function StudentPortal() {
       case 'achievements':
         return <Achievements />;
       case 'profile':
-        return <div className="text-center py-8 text-gray-500">Profile management coming soon...</div>;
+        return <Profile />;
       default:
         return <StudentDashboard onStartQuiz={handleStartQuiz} />;
     }

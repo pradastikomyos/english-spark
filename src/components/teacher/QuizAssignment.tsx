@@ -474,10 +474,7 @@ export function QuizAssignment() {
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-3">
-                    <div className="flex items-center justify-between text-sm">
-                      <Badge className={getDifficultyColor(assignment.quiz.difficulty)}>
-                        {assignment.quiz.difficulty}
-                      </Badge>
+                    <div className="flex items-center justify-end text-sm">
                       <div className="flex items-center gap-3 text-gray-600">
                         <div className="flex items-center gap-1">
                           <Clock className="h-4 w-4" />
@@ -503,10 +500,7 @@ export function QuizAssignment() {
                       )}
                     </div>
                     
-                    <div className="flex items-center gap-1 text-sm text-gray-600">
-                      <Users className="h-4 w-4" />
-                      <span>{assignment.class.student_count || 0} students</span>
-                    </div>
+                    
                   </div>
                 </CardContent>
               </Card>

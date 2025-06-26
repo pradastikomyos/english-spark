@@ -165,15 +165,6 @@ export function AssignedQuizzes({ onStartQuiz }: AssignedQuizzesProps) {
     }
   };
 
-  const getDifficultyColor = (difficulty: string) => {
-    switch (difficulty) {
-      case 'easy': return 'bg-green-100 text-green-800';
-      case 'medium': return 'bg-yellow-100 text-yellow-800';
-      case 'hard': return 'bg-red-100 text-red-800';
-      default: return 'bg-gray-100 text-gray-800';
-    }
-  };
-
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('en-US', {
       month: 'short',
@@ -282,9 +273,6 @@ export function AssignedQuizzes({ onStartQuiz }: AssignedQuizzesProps) {
                           {status === 'pending' && <AlertCircle className="h-3 w-3 mr-1" />}
                           {status === 'overdue' && <XCircle className="h-3 w-3 mr-1" />}
                           {status}
-                        </Badge>
-                        <Badge className={getDifficultyColor(assignment.quiz.difficulty)}>
-                          {assignment.quiz.difficulty}
                         </Badge>
                         {/* Badge status quiz */}
                         <Badge className={assignment.quiz.status === 'closed' ? 'bg-red-100 text-red-800' : 'bg-green-100 text-green-800'}>
