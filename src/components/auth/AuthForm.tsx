@@ -27,7 +27,7 @@ export function AuthForm() {
     name: '',
     email: '',
     password: '',
-    role: 'teacher' as UserRole,
+    role: 'student' as UserRole,
     studentId: '',
     className: '',
   });
@@ -137,11 +137,11 @@ export function AuthForm() {
             
             <TabsContent value="signup">
               <form onSubmit={handleSignUp} className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="role">Role</Label>
+                <div className="space-y-2 hidden">
+                  <Label>Role</Label>
                   <Select
                     value={signUpData.role}
-                    onValueChange={(value: UserRole) => 
+                    onValueChange={(value: UserRole) =>
                       setSignUpData({ ...signUpData, role: value })
                     }
                   >

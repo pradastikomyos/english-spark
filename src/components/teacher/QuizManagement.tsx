@@ -42,7 +42,6 @@ interface QuizFormState {
   title: string;
   description: string;
   time_limit: number;
-  points_per_question: number;
 }
 
 export default function QuizManagement() {
@@ -65,7 +64,6 @@ export default function QuizManagement() {
     title: '',
     description: '',
     time_limit: 600,
-    points_per_question: 10,
   });
 
   // Ambil kuis saat komponen dimuat jika profileId tersedia
@@ -125,7 +123,6 @@ export default function QuizManagement() {
       title: '',
       description: '',
       time_limit: 600,
-      points_per_question: 10,
     });
   };
 
@@ -133,9 +130,18 @@ export default function QuizManagement() {
   const handleCreateQuiz = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
+      const { title, description, time_limit } = quizForm;
       const { data, error } = await supabase
         .from('quizzes')
-        .insert({ ...quizForm, created_by: profileId })
+        .insert([
+          {
+            title,
+            description,
+            time_limit,
+            points_per_question: 0, // Set default value to 0 or null if the column allows
+            created_by: profileId,
+          },
+        ])
         .select()
         .single();
 
@@ -153,9 +159,10 @@ export default function QuizManagement() {
     e.preventDefault();
     if (!currentQuiz) return;
     try {
+      const { title, description, time_limit } = quizForm;
       const { data, error } = await supabase
         .from('quizzes')
-        .update({ ...quizForm, updated_at: new Date().toISOString() })
+        .update({ title, description, time_limit })
         .eq('id', currentQuiz.id)
         .select()
         .single();
@@ -198,7 +205,6 @@ export default function QuizManagement() {
       title: quiz.title,
       description: quiz.description,
       time_limit: quiz.time_limit,
-      points_per_question: quiz.points_per_question,
     });
     setIsEditDialogOpen(true);
   };
@@ -240,9 +246,8 @@ export default function QuizManagement() {
   if (selectedQuizId) {
     return (
       <QuestionManager 
-        quizId={selectedQuizId} 
+        quizId={selectedQuizId!} 
         onBack={() => setSelectedQuizId(null)}
-        teacherId={profileId!} 
       />
     );
   }
@@ -275,7 +280,7 @@ export default function QuizManagement() {
             <p className="mt-2 mb-6 text-muted-foreground">
               It looks like you haven't created any quizzes. Get started now!
             </p>
-            <Button onClick={openCreateDialog} size="lg">
+            <Button onClick={openCreateDialog} className="h-11 rounded-md px-8">
               <Plus className="mr-2 h-5 w-5" />
               Create Your First Quiz
             </Button>
@@ -290,7 +295,7 @@ export default function QuizManagement() {
                     <CardTitle className="text-lg font-semibold truncate" title={quiz.title}>{quiz.title}</CardTitle>
                     <Tooltip>
                       <TooltipTrigger>
-                        <Badge variant="outline" className={`${getDifficultyColor(quiz.difficulty)} text-white border-0`}>{quiz.difficulty}</Badge>
+                        <Badge className={`${getDifficultyColor(quiz.difficulty)} text-white border-0`}>{quiz.difficulty}</Badge>
                       </TooltipTrigger>
                       <TooltipContent>
                         <p>Difficulty Level</p>
@@ -303,14 +308,14 @@ export default function QuizManagement() {
                   <div className="grid grid-cols-3 gap-2 text-xs text-muted-foreground">
                     <div className="flex items-center gap-1" title="Number of Questions"><FileText className="h-3 w-3" /> {quiz.questionCount} Qs</div>
                     <div className="flex items-center gap-1" title="Time Limit"><Clock className="h-3 w-3" /> {formatTime(quiz.time_limit)}</div>
-                    <div className="flex items-center gap-1" title="Points per Question"><Award className="h-3 w-3" /> {quiz.points_per_question} pts</div>
+
                   </div>
                 </CardContent>
                 <CardFooter className="flex justify-between items-center pt-4 mt-auto bg-muted/30 px-4 py-2">
                   <div className="flex items-center space-x-1">
                     <Tooltip>
                       <TooltipTrigger asChild>
-                        <Button variant="default" size="sm" className="!bg-black !text-white !border !border-black hover:!bg-gray-900 focus:!ring-2 focus:!ring-black focus:!ring-offset-2 shadow-lg" onClick={() => setSelectedQuizId(quiz.id)}>
+                        <Button className="h-9 rounded-md px-3 !bg-black !text-white !border !border-black hover:!bg-gray-900 focus:!ring-2 focus:!ring-black focus:!ring-offset-2 shadow-lg" onClick={() => setSelectedQuizId(quiz.id)}>
                           Kelola Soal
                         </Button>
                       </TooltipTrigger>
@@ -320,7 +325,7 @@ export default function QuizManagement() {
                   <div className="flex items-center space-x-1">
                     <Tooltip>
                       <TooltipTrigger asChild>
-                        <Button variant="ghost" size="icon" onClick={() => openEditDialog(quiz)}>
+                        <Button className="h-10 w-10 hover:bg-accent hover:text-accent-foreground" onClick={() => openEditDialog(quiz)}>
                           <Edit className="h-4 w-4" />
                         </Button>
                       </TooltipTrigger>
@@ -328,7 +333,7 @@ export default function QuizManagement() {
                     </Tooltip>
                     <Tooltip>
                       <TooltipTrigger asChild>
-                        <Button variant="ghost" size="icon" onClick={() => openDeleteDialog(quiz)}>
+                        <Button className="h-10 w-10 hover:bg-accent hover:text-accent-foreground" onClick={() => openDeleteDialog(quiz)}>
                           <Trash2 className="h-4 w-4 text-red-500" />
                         </Button>
                       </TooltipTrigger>
@@ -361,12 +366,9 @@ export default function QuizManagement() {
                 <Label htmlFor="time_limit">Time Limit (seconds)</Label>
                 <Input id="time_limit" type="number" value={quizForm.time_limit} onChange={(e) => setQuizForm({ ...quizForm, time_limit: parseInt(e.target.value, 10) })} required />
               </div>
-              <div>
-                <Label htmlFor="points_per_question">Points per Question</Label>
-                <Input id="points_per_question" type="number" value={quizForm.points_per_question} onChange={(e) => setQuizForm({ ...quizForm, points_per_question: parseInt(e.target.value, 10) })} required />
-              </div>
+
               <DialogFooter>
-                <Button type="button" variant="ghost" onClick={() => setIsCreateDialogOpen(false)}>Cancel</Button>
+                <Button type="button" className="hover:bg-accent hover:text-accent-foreground" onClick={() => setIsCreateDialogOpen(false)}>Cancel</Button>
                 <Button type="submit">Create Quiz</Button>
               </DialogFooter>
             </form>
@@ -392,12 +394,9 @@ export default function QuizManagement() {
                 <Label htmlFor="edit-time_limit">Time Limit (seconds)</Label>
                 <Input id="edit-time_limit" type="number" value={quizForm.time_limit} onChange={(e) => setQuizForm({ ...quizForm, time_limit: parseInt(e.target.value, 10) })} required />
               </div>
-              <div>
-                <Label htmlFor="edit-points_per_question">Points per Question</Label>
-                <Input id="edit-points_per_question" type="number" value={quizForm.points_per_question} onChange={(e) => setQuizForm({ ...quizForm, points_per_question: parseInt(e.target.value, 10) })} required />
-              </div>
+
               <DialogFooter>
-                <Button type="button" variant="ghost" onClick={() => setIsEditDialogOpen(false)}>Cancel</Button>
+                <Button type="button" className="hover:bg-accent hover:text-accent-foreground" onClick={() => setIsEditDialogOpen(false)}>Cancel</Button>
                 <Button type="submit">Update Quiz</Button>
               </DialogFooter>
             </form>
