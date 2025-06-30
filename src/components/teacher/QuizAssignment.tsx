@@ -8,7 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
-import { Send, Users, Clock, Award, Target, CheckCircle, AlertCircle, XCircle } from 'lucide-react';
+import { Send, Users, Clock, Award, Target, CheckCircle, AlertCircle, XCircle, Trash2 } from 'lucide-react';
 
 interface Quiz {
   id: string;
@@ -51,6 +51,8 @@ export function QuizAssignment() {
   const [dueDays, setDueDays] = useState<string>('7');
   const [isStatusChangeDialogOpen, setIsStatusChangeDialogOpen] = useState(false);
   const [quizToChangeStatus, setQuizToChangeStatus] = useState<Quiz | null>(null);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [assignmentToDelete, setAssignmentToDelete] = useState<Assignment | null>(null);
 
   useEffect(() => {
     if (profileId) {
@@ -118,6 +120,32 @@ export function QuizAssignment() {
 
     if (error) throw error;
     setAssignments(data as Assignment[] || []);
+  };
+
+  const handleDeleteAssignment = async () => {
+    if (!assignmentToDelete) return;
+
+    const { error } = await supabase
+      .from('class_quizzes')
+      .delete()
+      .eq('id', assignmentToDelete.id);
+
+    if (error) {
+      toast({
+        title: 'Error Deleting Assignment',
+        description: error.message,
+        variant: 'destructive',
+      });
+    } else {
+      toast({
+        title: 'Assignment Deleted',
+        description: `The assignment for "${assignmentToDelete.quiz.title}" has been deleted.`,
+      });
+      setAssignments(assignments.filter(a => a.id !== assignmentToDelete.id));
+    }
+
+    setIsDeleteDialogOpen(false);
+    setAssignmentToDelete(null);
   };
 
   const handleAssignQuiz = async () => {
@@ -466,6 +494,30 @@ export function QuizAssignment() {
                                 <SelectItem value="closed">Closed</SelectItem>
                               </SelectContent>
                             </Select>
+                          </div>
+                        </DialogContent>
+                      </Dialog>
+
+                      <Dialog open={isDeleteDialogOpen && assignmentToDelete?.id === assignment.id} onOpenChange={setIsDeleteDialogOpen}>
+                        <DialogTrigger asChild>
+                          <Button
+                            variant="destructive"
+                            size="sm"
+                            onClick={() => setAssignmentToDelete(assignment)}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </DialogTrigger>
+                        <DialogContent className="max-w-xs">
+                          <DialogHeader>
+                            <DialogTitle>Delete Assignment?</DialogTitle>
+                            <CardDescription>
+                              Are you sure you want to delete the assignment "{assignment.quiz.title}" for class "{assignment.class.name}"? This action cannot be undone.
+                            </CardDescription>
+                          </DialogHeader>
+                          <div className="flex justify-end space-x-2 pt-4">
+                            <Button variant="outline" onClick={() => setIsDeleteDialogOpen(false)}>Cancel</Button>
+                            <Button variant="destructive" onClick={handleDeleteAssignment}>Delete</Button>
                           </div>
                         </DialogContent>
                       </Dialog>
