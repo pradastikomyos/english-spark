@@ -50,3 +50,21 @@ const UserBadgeDisplay: React.FC<UserBadgeDisplayProps> = ({ userPoints }) => {
 
 export default UserBadgeDisplay;
 */
+
+export function calculateTimeBonus(timeTaken: number, timeLimit: number): number {
+  if (timeLimit <= 0) {
+    return 0;
+  }
+
+  const percentageTime = (timeTaken / timeLimit) * 100;
+
+  if (percentageTime <= 25) {
+    return 30; // Fastest tier
+  } else if (percentageTime <= 50) {
+    return 20; // Medium tier
+  } else if (percentageTime <= 75) {
+    return 10; // Slowest tier
+  }
+
+  return 0; // No bonus
+}

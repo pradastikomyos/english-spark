@@ -8,6 +8,7 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
+import { calculateTimeBonus } from '@/lib/gamification';
 import { 
   Clock, 
   CheckCircle, 
@@ -66,6 +67,7 @@ export function QuizTaking({ quizId, onComplete, onBack }: QuizTakingProps): JSX
   const [loading, setLoading] = useState(true);
   const [showResults, setShowResults] = useState(false);
   const [totalPoints, setTotalPoints] = useState(0);
+  const [timeBonusPoints, setTimeBonusPoints] = useState(0);
   const [pointsByDifficulty, setPointsByDifficulty] = useState({ easy: 0, medium: 0, hard: 0 });
 
   useEffect(() => {
@@ -175,6 +177,12 @@ export function QuizTaking({ quizId, onComplete, onBack }: QuizTakingProps): JSX
       let correctAnswers = 0;
       const pointsBreakdown = { easy: 0, medium: 0, hard: 0 };
       let totalPointsEarned = 0;
+
+      // Calculate time bonus
+      const timeTaken = quiz!.time_limit - timeLeft;
+      const bonusPoints = calculateTimeBonus(timeTaken, quiz!.time_limit);
+      setTimeBonusPoints(bonusPoints);
+      totalPointsEarned += bonusPoints;
 
       const userAnswersToInsert = questions.map(question => {
         const userAnswer = answers[question.id];
@@ -390,6 +398,15 @@ export function QuizTaking({ quizId, onComplete, onBack }: QuizTakingProps): JSX
               <span className="font-bold text-gray-800">Total Points Earned</span>
               <span className="font-bold text-xl text-blue-600">{totalPoints}</span>
             </div>
+            {timeBonusPoints > 0 && (
+              <div className="border-t pt-3 mt-3 flex justify-between items-center text-blue-600 bg-blue-50 p-2 rounded-lg">
+                <span className="font-semibold flex items-center gap-2">
+                  <Trophy className="h-5 w-5 text-yellow-500" />
+                  Time Bonus
+                </span>
+                <span className="font-bold text-lg">+{timeBonusPoints}</span>
+              </div>
+            )}
           </CardContent>
         </Card>
 
