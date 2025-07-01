@@ -22,6 +22,7 @@ import {
   Users, // Added for total classmates stat
   Hash // Added for rank stat
 } from 'lucide-react';
+import { QuizReview } from './QuizReview'; // Import the new component
 
 interface StudentData {
   id: string;
@@ -44,20 +45,23 @@ interface DashboardStats {
 
 interface StudentDashboardProps {
   onStartQuiz: (quizId: string) => void;
+  onReviewQuiz: (quizId: string) => void; // Add this prop
 }
 
-export function StudentDashboard({ onStartQuiz }: StudentDashboardProps) {
+export function StudentDashboard({ onStartQuiz, onReviewQuiz }: StudentDashboardProps) {
   const { profileId } = useAuth();
-  const { toast } = useToast();  const [stats, setStats] = useState<DashboardStats>({
+  const { toast } = useToast();
+  const [stats, setStats] = useState<DashboardStats>({
     studentData: null,
     recentQuizzes: [],
     achievements: [],
     availableQuizzes: [],
     assignedQuizzes: [],
     classRank: 0,
-  totalClassmates: 0,
+    totalClassmates: 0,
   });
   const [loading, setLoading] = useState(true);
+  const [reviewingQuiz, setReviewingQuiz] = useState(null); // Add this state
 
   useEffect(() => {
     if (profileId) {
@@ -85,7 +89,9 @@ export function StudentDashboard({ onStartQuiz }: StudentDashboardProps) {
         `)
         .eq('student_id', profileId)
         .order('completed_at', { ascending: false })
-        .limit(5);      // Fetch available quizzes
+        .limit(5);
+
+      // Fetch available quizzes
       const { data: availableQuizzes } = await supabase
         .from('class_quizzes')
         .select(`
@@ -152,7 +158,7 @@ export function StudentDashboard({ onStartQuiz }: StudentDashboardProps) {
           .order('total_points', { ascending: false });
 
         const rank = classmates?.findIndex(s => s.total_points <= studentData.total_points) + 1 || 0;
-          setStats({
+        setStats({
           studentData,
           recentQuizzes: recentQuizzes || [],
           achievements: achievements || [],
@@ -215,6 +221,10 @@ export function StudentDashboard({ onStartQuiz }: StudentDashboardProps) {
     </Card>
   );
 
+  const handleReviewQuiz = (quizId: string) => {
+    setReviewingQuiz(quizId);
+  };
+
   if (loading) {
     return (
       <div className="space-y-6">
@@ -233,6 +243,10 @@ export function StudentDashboard({ onStartQuiz }: StudentDashboardProps) {
         </div>
       </div>
     );
+  }
+
+  if (reviewingQuiz) {
+    return <QuizReview quizId={reviewingQuiz} onBack={() => setReviewingQuiz(null)} />;
   }
 
   const { studentData } = stats;
@@ -403,9 +417,9 @@ export function StudentDashboard({ onStartQuiz }: StudentDashboardProps) {
                         </div>
                         <Button 
                           size="sm"
-                          onClick={() => onStartQuiz(assignment.quiz_id)}
+                          onClick={() => assignment.completed ? handleReviewQuiz(assignment.quiz_id) : onStartQuiz(assignment.quiz_id)}
                         >
-                          {assignment.completed ? "Review" : "Start"}
+                          {assignment.completed ? "Review Results" : "Start Quiz"}
                         </Button>
                       </div>
                     );

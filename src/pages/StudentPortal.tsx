@@ -11,11 +11,13 @@ import { Achievements } from '@/components/student/Achievements';
 import Profile from '@/components/student/Profile';
 import { useToast } from '@/hooks/use-toast';
 import { useIsMobile } from '@/hooks/use-mobile';
+import { QuizReview } from '@/components/student/QuizReview';
 
 export default function StudentPortal() {
   const [currentPage, setCurrentPage] = useState('dashboard');
   const [selectedQuizId, setSelectedQuizId] = useState<string | null>(null);
   const [takingQuiz, setTakingQuiz] = useState(false);
+  const [reviewingQuizId, setReviewingQuizId] = useState<string | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false); // State for sidebar
   const { toast } = useToast();
   const isMobile = useIsMobile();
@@ -31,6 +33,10 @@ export default function StudentPortal() {
     setTakingQuiz(true);
   };
 
+  const handleReviewQuiz = (quizId: string) => {
+    setReviewingQuizId(quizId);
+  };
+
   const handleQuizComplete = (score: number, totalQuestions: number) => {
     toast({
       title: '🎉 Quiz Completed!',
@@ -43,6 +49,10 @@ export default function StudentPortal() {
   const handleBackFromQuiz = () => {
     setTakingQuiz(false);
     setSelectedQuizId(null);
+  };
+
+  const handleBackFromReview = () => {
+    setReviewingQuizId(null);
   };
 
   // If taking a quiz, show quiz interface
@@ -63,13 +73,27 @@ export default function StudentPortal() {
       </StudentLayout>
     );
   }
+
+  if (reviewingQuizId) {
+    return (
+      <StudentLayout
+        currentPage={currentPage}
+        onPageChange={setCurrentPage}
+        sidebarOpen={sidebarOpen}
+        setSidebarOpen={setSidebarOpen}
+        isTakingQuiz={false}
+      >
+        <QuizReview quizId={reviewingQuizId} onBack={handleBackFromReview} />
+      </StudentLayout>
+    );
+  }
   
   const renderPage = () => {
     switch (currentPage) {
       case 'dashboard':
-        return <StudentDashboard onStartQuiz={handleStartQuiz} />;
+        return <StudentDashboard onStartQuiz={handleStartQuiz} onReviewQuiz={handleReviewQuiz} />;
       case 'assigned':
-        return <AssignedQuizzes onStartQuiz={handleStartQuiz} />;
+        return <AssignedQuizzes onStartQuiz={handleStartQuiz} onReviewQuiz={handleReviewQuiz} />;
       case 'results':
         return <QuizResults />;
       case 'leaderboard':
@@ -81,7 +105,7 @@ export default function StudentPortal() {
       case 'profile':
         return <Profile />;
       default:
-        return <StudentDashboard onStartQuiz={handleStartQuiz} />;
+        return <StudentDashboard onStartQuiz={handleStartQuiz} onReviewQuiz={handleReviewQuiz} />;
     }
   };
 

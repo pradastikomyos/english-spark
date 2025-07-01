@@ -55,9 +55,10 @@ interface AssignedQuiz {
 
 interface AssignedQuizzesProps {
   onStartQuiz: (quizId: string) => void;
+  onReviewQuiz: (quizId: string) => void;
 }
 
-export function AssignedQuizzes({ onStartQuiz }: AssignedQuizzesProps) {
+export function AssignedQuizzes({ onStartQuiz, onReviewQuiz }: AssignedQuizzesProps) {
   const { profileId } = useAuth();
   const { toast } = useToast();
   const [assignments, setAssignments] = useState<AssignedQuiz[]>([]);
@@ -340,7 +341,7 @@ export function AssignedQuizzes({ onStartQuiz }: AssignedQuizzesProps) {
                       <Button
                         variant="outline"
                         size="sm"
-                        onClick={() => onStartQuiz(assignment.quiz.id)}
+                        onClick={() => onReviewQuiz(assignment.quiz.id)}
                       >
                         Review Results
                       </Button>

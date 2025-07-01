@@ -171,12 +171,12 @@ export function QuizTaking({ quizId, onComplete, onBack }: QuizTakingProps): JSX
   const submitQuiz = async () => {
     try {
       setIsCompleted(true);
-      
+
       let correctAnswers = 0;
       const pointsBreakdown = { easy: 0, medium: 0, hard: 0 };
       let totalPointsEarned = 0;
 
-      questions.forEach(question => {
+      const userAnswersToInsert = questions.map(question => {
         const userAnswer = answers[question.id];
         const isCorrect = userAnswer === question.correct_answer;
         if (isCorrect) {
@@ -188,16 +188,23 @@ export function QuizTaking({ quizId, onComplete, onBack }: QuizTakingProps): JSX
             pointsBreakdown[difficulty] += points;
           }
         }
+        return {
+          student_id: profileId,
+          quiz_id: quizId,
+          question_id: question.id,
+          selected_option: userAnswer,
+          is_correct: isCorrect,
+        };
       });
 
       const totalScore = questions.length > 0 ? Math.round((correctAnswers / questions.length) * 100) : 0;
-      
+
       setScore(totalScore);
       setTotalPoints(totalPointsEarned);
       setPointsByDifficulty(pointsBreakdown);
 
-      // Save to database
-      const { error } = await supabase
+      // Save user progress to get an ID
+      const { data: progressData, error: progressError } = await supabase
         .from('user_progress')
         .insert({
           student_id: profileId,
@@ -205,9 +212,19 @@ export function QuizTaking({ quizId, onComplete, onBack }: QuizTakingProps): JSX
           score: totalScore,
           total_questions: questions.length,
           time_taken: quiz!.time_limit - timeLeft,
-        });
+        })
+        .select('id')
+        .single();
 
-      if (error) throw error;
+      if (progressError) throw progressError;
+
+      const userProgressId = progressData.id;
+
+      // Add user_progress_id to each answer and insert
+      const answersWithProgressId = userAnswersToInsert.map(answer => ({ ...answer, user_progress_id: userProgressId }));
+      const { error: answersError } = await supabase.from('user_answers' as any).insert(answersWithProgressId);
+
+      if (answersError) throw answersError;
 
       // Update student points
       const { data: student } = await supabase
@@ -230,7 +247,7 @@ export function QuizTaking({ quizId, onComplete, onBack }: QuizTakingProps): JSX
       }
 
       setShowResults(true);
-      
+
       toast({
         title: '🎉 Quiz Completed!',
         description: `You scored ${totalScore.toFixed(0)}% and earned ${totalPointsEarned} points!`,
