@@ -1,10 +1,10 @@
 import { useState, useEffect } from 'react';
 import { TeacherLayout } from '@/components/teacher/TeacherLayout';
 import { TeacherDashboard } from '@/components/teacher/TeacherDashboard';
-import { StudentsManagement } from '@/components/teacher/StudentsManagement';
 import QuizManagement from '@/components/teacher/QuizManagement';
 import { QuizAssignment } from '@/components/teacher/QuizAssignment';
 import Reports from '@/components/teacher/Reports';
+import MaterialManagement from '@/components/teacher/MaterialManagement';
 import Settings from '@/components/teacher/Settings';
 import { useIsMobile } from '@/hooks/use-mobile';
 
@@ -23,12 +23,12 @@ export default function TeacherPortal() {
     switch (currentPage) {
       case 'dashboard':
         return <TeacherDashboard />;
-      case 'students':
-        return <StudentsManagement />;
       case 'quizzes':
         return <QuizManagement />;
       case 'assignment':
         return <QuizAssignment />;
+      case 'materials':
+        return <MaterialManagement />;
       case 'reports':
         return <Reports />;
       case 'settings':

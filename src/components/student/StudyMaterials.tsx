@@ -1,4 +1,6 @@
 import { useState, useEffect } from 'react';
+
+import { supabase } from '@/lib/supabase';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -24,21 +26,25 @@ import {
   Target
 } from 'lucide-react';
 
+interface StudyMaterialsProps {
+  onStartMaterial: (materialId: string) => void;
+}
+
 interface StudyMaterial {
   id: string;
   title: string;
   description: string;
-  type: 'article' | 'video' | 'audio' | 'quiz' | 'interactive';
-  category: 'grammar' | 'vocabulary' | 'conversation' | 'business' | 'pronunciation';
-  difficulty: 'beginner' | 'intermediate' | 'advanced';
-  estimatedTime: number; // in minutes
-  isCompleted: boolean;
+  type: string;
+  category: string;
+  difficulty: string;
+  estimated_time: number; // in minutes
+  is_completed: boolean;
   rating: number;
   url?: string;
   content?: string;
 }
 
-export function StudyMaterials() {
+export function StudyMaterials({ onStartMaterial }: StudyMaterialsProps) {
   const { toast } = useToast();
   const [materials, setMaterials] = useState<StudyMaterial[]>([]);
   const [filteredMaterials, setFilteredMaterials] = useState<StudyMaterial[]>([]);
@@ -48,7 +54,6 @@ export function StudyMaterials() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Simulate loading study materials
     loadStudyMaterials();
   }, []);
 
@@ -59,87 +64,23 @@ export function StudyMaterials() {
   const loadStudyMaterials = async () => {
     try {
       setLoading(true);
-      // In a real app, this would fetch from your backend
-      const mockMaterials: StudyMaterial[] = [
-        {
-          id: '1',
-          title: 'Basic Greetings and Introductions',
-          description: 'Learn how to introduce yourself and greet people in English. Perfect for beginners!',
-          type: 'article',
-          category: 'conversation',
-          difficulty: 'beginner',
-          estimatedTime: 15,
-          isCompleted: false,
-          rating: 4.8,
-          content: 'Interactive lesson on basic greetings...'
-        },
-        {
-          id: '2',
-          title: 'Business Email Writing',
-          description: 'Master the art of professional email communication in English.',
-          type: 'interactive',
-          category: 'business',
-          difficulty: 'intermediate',
-          estimatedTime: 30,
-          isCompleted: true,
-          rating: 4.9,
-          content: 'Professional email templates and exercises...'
-        },
-        {
-          id: '3',
-          title: 'English Pronunciation Guide',
-          description: 'Audio lessons to improve your English pronunciation and accent.',
-          type: 'audio',
-          category: 'pronunciation',
-          difficulty: 'intermediate',
-          estimatedTime: 45,
-          isCompleted: false,
-          rating: 4.7,
-          url: '#'
-        },
-        {
-          id: '4',
-          title: 'Essential Vocabulary for IT Professionals',
-          description: 'Technical vocabulary every IT professional should know.',
-          type: 'quiz',
-          category: 'vocabulary',
-          difficulty: 'advanced',
-          estimatedTime: 25,
-          isCompleted: false,
-          rating: 4.6,
-          content: 'Interactive vocabulary exercises...'
-        },
-        {
-          id: '5',
-          title: 'Grammar Fundamentals',
-          description: 'Complete guide to English grammar basics with examples.',
-          type: 'video',
-          category: 'grammar',
-          difficulty: 'beginner',
-          estimatedTime: 60,
-          isCompleted: false,
-          rating: 4.8,
-          url: '#'
-        },
-        {
-          id: '6',
-          title: 'Job Interview Preparation',
-          description: 'Prepare for English job interviews with common questions and answers.',
-          type: 'interactive',
-          category: 'business',
-          difficulty: 'advanced',
-          estimatedTime: 40,
-          isCompleted: false,
-          rating: 4.9,
-          content: 'Job interview simulation...'
-        }
-      ];
-      
-      setMaterials(mockMaterials);
-    } catch (error) {
+      const { data, error } = await supabase.rpc('get_study_materials_with_status');
+
+      if (error) {
+        throw error;
+      }
+
+      if (data) {
+        // Ensure rating is a number, default to 0 if null
+        const materialsWithParsedRating = data.map(m => ({...m, rating: m.rating ? Number(m.rating) : 0}));
+        setMaterials(materialsWithParsedRating);
+      }
+
+    } catch (error: any) {
+      console.error('Error loading materials:', error);
       toast({
         title: 'Error',
-        description: 'Failed to load study materials',
+        description: `Failed to load study materials: ${error.message}`,
         variant: 'destructive',
       });
     } finally {
@@ -229,19 +170,10 @@ export function StudyMaterials() {
   };
 
   const handleStartMaterial = (material: StudyMaterial) => {
-    toast({
-      title: `🚀 Starting: ${material.title}`,
-      description: `Estimated time: ${material.estimatedTime} minutes`,
-    });
-    
-    // In a real app, this would navigate to the material content
-    // For now, we'll just mark it as completed
-    setMaterials(prev => prev.map(m => 
-      m.id === material.id ? { ...m, isCompleted: true } : m
-    ));
+    onStartMaterial(material.id);
   };
 
-  const completedCount = materials.filter(m => m.isCompleted).length;
+  const completedCount = materials.filter(m => m.is_completed).length;
   const completionPercentage = materials.length > 0 ? (completedCount / materials.length) * 100 : 0;
 
   if (loading) {
@@ -335,7 +267,7 @@ export function StudyMaterials() {
         ) : (
           filteredMaterials.map((material) => (
             <Card key={material.id} className={`transition-all hover:shadow-lg ${
-              material.isCompleted ? 'ring-2 ring-green-200 bg-green-50' : ''
+              material.is_completed ? 'ring-2 ring-green-200 bg-green-50' : ''
             }`}>
               <CardHeader className="pb-4">
                 <div className="flex items-start justify-between">
@@ -348,7 +280,7 @@ export function StudyMaterials() {
                       {material.difficulty}
                     </Badge>
                   </div>
-                  {material.isCompleted && (
+                  {material.is_completed && (
                     <CheckCircle className="h-6 w-6 text-green-500" />
                   )}
                 </div>
@@ -368,7 +300,7 @@ export function StudyMaterials() {
                     </div>
                     <div className="flex items-center gap-1">
                       <Clock className="h-4 w-4" />
-                      <span>{material.estimatedTime} min</span>
+                      <span>{material.estimated_time} min</span>
                     </div>
                   </div>
 
@@ -393,9 +325,9 @@ export function StudyMaterials() {
                   <Button
                     onClick={() => handleStartMaterial(material)}
                     className="w-full"
-                    variant={material.isCompleted ? "outline" : "default"}
+                    variant={material.is_completed ? "outline" : "default"}
                   >
-                    {material.isCompleted ? (
+                    {material.is_completed ? (
                       <>
                         <CheckCircle className="h-4 w-4 mr-2" />
                         Review

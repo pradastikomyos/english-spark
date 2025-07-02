@@ -11,7 +11,8 @@ import {
   LogOut,
   Menu,
   X,
-  Send
+  Send,
+  BookOpen
 } from 'lucide-react';
 import { ThemeToggle } from '@/components/theme-toggle';
 import { cn } from '@/lib/utils';
@@ -28,8 +29,8 @@ export function TeacherLayout({ children, currentPage, onPageChange, sidebarOpen
   const { signOut } = useAuth();
   const navigation = [
     { name: 'Dashboard', id: 'dashboard', icon: LayoutDashboard },
-    { name: 'Students', id: 'students', icon: Users },
     { name: 'Quizzes', id: 'quizzes', icon: FileText },
+    { name: 'Materials', id: 'materials', icon: BookOpen },
     { name: 'Assignment', id: 'assignment', icon: Send },
     { name: 'Reports', id: 'reports', icon: BarChart3 },
     { name: 'Settings', id: 'settings', icon: Settings },

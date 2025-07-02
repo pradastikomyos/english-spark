@@ -2,6 +2,7 @@
 import { useEffect, useState } from 'react';
 import { useAuth, AuthProvider } from '@/hooks/useAuth';
 import { AuthForm } from '@/components/auth/AuthForm';
+import AdminPortal from '@/pages/AdminPortal';
 import TeacherPortal from '@/pages/TeacherPortal';
 import StudentPortal from '@/pages/StudentPortal';
 import { Toaster } from "@/components/ui/toaster";
@@ -57,6 +58,10 @@ function AppContent() {
 
   if (!user) {
     return <AuthForm />;
+  }
+
+  if (userRole === 'admin') {
+    return <AdminPortal />;
   }
 
   if (userRole === 'teacher') {

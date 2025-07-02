@@ -9,10 +9,10 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
-import { supabase } from '@/integrations/supabase/client';
+import { supabase } from '@/lib/supabase';
 import { Plus, FileText, CheckCircle, XCircle, Edit, Trash2 } from 'lucide-react';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
-import { CreateQuestionForm } from './CreateQuestionForm';
+import CreateQuestionForm from './CreateQuestionForm';
 
 interface Question {
   id: string;
@@ -24,7 +24,8 @@ interface Question {
   points: number;
   question_order: number;
   created_at: string;
-  difficulty: 'easy' | 'medium' | 'hard'; // Add difficulty to Question interface
+  difficulty: 'easy' | 'medium' | 'hard';
+  media_url: string | null; // Add media_url to Question interface
 }
 
 interface QuestionManagerProps {
@@ -39,11 +40,12 @@ export function QuestionManager({ quizId, quizTitle, onClose, onBack }: Question
   const { toast } = useToast();
   const [questions, setQuestions] = useState<Question[]>([]);
   const [loading, setLoading] = useState(true);
-  const [isCreateQuestionDialogOpen, setIsCreateQuestionDialogOpen] = useState(false); // Renamed state
+  const [isCreateQuestionDialogOpen, setIsCreateQuestionDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [currentQuestion, setCurrentQuestion] = useState<Question | null>(null);
   const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
   const [questionToDelete, setQuestionToDelete] = useState<Question | null>(null);
+  const [zoomedImageUrl, setZoomedImageUrl] = useState<string | null>(null);
   
   const [questionForm, setQuestionForm] = useState({
     question_text: '',
@@ -53,8 +55,8 @@ export function QuestionManager({ quizId, quizTitle, onClose, onBack }: Question
     option_d: '',
     correct_answer: 'A' as 'A' | 'B' | 'C' | 'D',
     explanation: '',
-    points: 0, // Default to 0, will be set by CreateQuestionForm
-    difficulty: 'medium' as 'easy' | 'medium' | 'hard', // Add difficulty to form state
+    points: 0,
+    difficulty: 'medium' as 'easy' | 'medium' | 'hard',
   });
 
   useEffect(() => {
@@ -68,13 +70,13 @@ export function QuestionManager({ quizId, quizTitle, onClose, onBack }: Question
       
       const { data, error } = await supabase
         .from('questions')
-        .select('*')
+        .select('*, media_url') // Include media_url in the select query
         .eq('quiz_id', quizId)
         .order('question_order', { ascending: true });
 
       if (error) throw error;
         console.log('📝 Quiz questions:', data);
-        console.log('Fetched questions data:', data); // Added console.log statement
+        console.log('Fetched questions data:', data);
       setQuestions((data || []) as any as Question[]);
     } catch (error: any) {
       console.error('❌ Fetch questions error:', error);
@@ -102,62 +104,6 @@ export function QuestionManager({ quizId, quizTitle, onClose, onBack }: Question
     });
   };
 
-  const handleCreateQuestion = async (
-    questionName: string,
-    difficulty: 'easy' | 'medium' | 'hard',
-    points: number,
-    options: string[],
-    correctIndex: number
-  ) => {
-    try {
-      console.log('📝 Creating question with new format:', { questionName, difficulty, points, options, correctIndex });
-      
-      const nextOrderNumber = questions.length + 1;
-
-      // Build the new 'options' JSON object
-      const optionsObject = {
-        'A': options[0] || '',
-        'B': options[1] || '',
-        'C': options[2] || '',
-        'D': options[3] || '',
-      };
-      
-      const { data, error } = await supabase
-        .from('questions')
-        .insert({
-          quiz_id: quizId,
-          question_text: questionName,
-          options: optionsObject, // Use the new JSON format
-          correct_answer: String.fromCharCode(65 + correctIndex) as 'A' | 'B' | 'C' | 'D',
-          explanation: '',
-          points: points,
-          question_order: nextOrderNumber,
-          difficulty: difficulty,
-        })
-        .select()
-        .single();
-
-      if (error) throw error;
-      
-      console.log('✅ Question created successfully:', data);
-      
-      toast({
-        title: 'Success',
-        description: 'Soal berhasil ditambahkan!',
-      });
-
-      setIsCreateQuestionDialogOpen(false);
-      fetchQuestions();
-    } catch (error: any) {
-      console.error('❌ Create question error:', error);
-      toast({
-        title: 'Error',
-        description: error.message || 'Failed to create question',
-        variant: 'destructive',
-      });
-    }
-  };
-
   const handleEditQuestion = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -178,7 +124,7 @@ export function QuestionManager({ quizId, quizTitle, onClose, onBack }: Question
         .from('questions')
         .update({
           question_text: questionForm.question_text,
-          options: optionsObject, // Use the new JSON format
+          options: optionsObject,
           correct_answer: questionForm.correct_answer,
           explanation: questionForm.explanation,
           points: questionForm.points,
@@ -269,9 +215,73 @@ export function QuestionManager({ quizId, quizTitle, onClose, onBack }: Question
   const getDifficultyColor = (answer: string, correct: string) => {
     return answer === correct ? 'bg-green-100 border-green-500 text-green-700' : 'bg-gray-50 border-gray-200';
   };
+
+  const renderMedia = (url: string | null) => {
+    if (!url) return null;
+
+    // YouTube video
+    const youtubeRegex = /(?:https?):\/\/(?:www\.)?(?:youtube\.com\/watch\?v=|youtu\.be\/)([a-zA-Z0-9_-]{11})/;
+    const youtubeMatch = url.match(youtubeRegex);
+
+    if (youtubeMatch && youtubeMatch[1]) {
+      const videoId = youtubeMatch[1];
+      return (
+        <div className="relative my-2" style={{ paddingBottom: '56.25%', height: 0 }}>
+          <iframe
+            src={`https://www.youtube.com/embed/${videoId}`}
+            frameBorder="0"
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+            allowFullScreen
+            title="Embedded YouTube video"
+            className="absolute top-0 left-0 w-full h-full rounded-md"
+          ></iframe>
+        </div>
+      );
+    }
+
+    // Image
+    const isImage = /\.(jpeg|jpg|gif|png)$/i.test(url);
+    if (isImage) {
+      return (
+        <img
+          src={url}
+          alt="Question media"
+          className="max-w-xs max-h-48 object-contain my-2 rounded-md cursor-pointer transition-transform duration-200 hover:scale-105"
+          onClick={() => setZoomedImageUrl(url)}
+        />
+      );
+    }
+
+    // Audio
+    const isAudio = /\.(mp3|wav|ogg)$/i.test(url);
+    if (isAudio) {
+      return <audio controls src={url} className="w-full my-2">Your browser does not support the audio element.</audio>;
+    }
+
+    return null;
+  };
  
   return (
     <div className="space-y-6">
+      {zoomedImageUrl && (
+        <div
+          className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50"
+          onClick={() => setZoomedImageUrl(null)}
+        >
+          <img
+            src={zoomedImageUrl}
+            alt="Zoomed media"
+            className="max-w-[90vw] max-h-[90vh] object-contain"
+            onClick={(e) => e.stopPropagation()}
+          />
+          <button
+            onClick={() => setZoomedImageUrl(null)}
+            className="absolute top-4 right-4 text-white text-4xl font-bold"
+          >
+            &times;
+          </button>
+        </div>
+      )}
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-2xl font-bold">Question Management</h2>
@@ -297,11 +307,10 @@ export function QuestionManager({ quizId, quizTitle, onClose, onBack }: Question
               </Button>
             </DialogTrigger>
             <CreateQuestionForm
+              quizId={quizId}
               isOpen={isCreateQuestionDialogOpen}
               onClose={() => setIsCreateQuestionDialogOpen(false)}
-              onCreateQuestion={(questionName, difficulty, points, options, correctIndex) =>
-                handleCreateQuestion(questionName, difficulty, points, options, correctIndex)
-              }
+              onQuestionCreated={fetchQuestions}
             />
           </Dialog>
           
@@ -340,6 +349,8 @@ export function QuestionManager({ quizId, quizTitle, onClose, onBack }: Question
                   </div>
                   <h3 className="font-semibold text-lg mb-3">{question.question_text}</h3>
                   
+                  {question.media_url && renderMedia(question.media_url)}
+
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
                     {question.options && Object.keys(question.options).length > 0 && Object.values(question.options).some(v => v) ? (
                       Object.entries(question.options).map(([key, value]) => (

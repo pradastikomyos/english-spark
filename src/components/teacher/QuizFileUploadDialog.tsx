@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { DialogHeader } from '@/components/ui/dialog'; // Keep DialogHeader import if it's used elsewhere or for styling
 import { useToast } from '@/hooks/use-toast';
-import { supabase } from '@/integrations/supabase/client';
+import { supabase } from '@/lib/supabase';
 import { FileText, UploadCloud, Loader2 } from 'lucide-react';
 import { useDropzone } from 'react-dropzone';
 

@@ -1,6 +1,5 @@
-
 -- Create enum for user roles
-CREATE TYPE user_role AS ENUM ('student', 'teacher');
+CREATE TYPE user_role AS ENUM ('student', 'teacher', 'admin');
 
 -- Create enum for difficulty levels
 CREATE TYPE difficulty_level AS ENUM ('easy', 'medium', 'hard');
@@ -150,131 +149,70 @@ $$;
 
 -- RLS Policies for teachers
 CREATE POLICY "Teachers can view their own data" ON teachers
-  FOR ALL USING (id = get_user_profile_id(auth.uid()));
+  FOR SELECT USING (auth.uid() = (SELECT user_id FROM user_roles WHERE profile_id = teachers.id AND role = 'teacher'));
 
--- RLS Policies for classes
-CREATE POLICY "Teachers can manage their classes" ON classes
-  FOR ALL USING (teacher_id = get_user_profile_id(auth.uid()));
-
-CREATE POLICY "Students can view their class" ON classes
-  FOR SELECT USING (id = (SELECT class_id FROM students WHERE id = get_user_profile_id(auth.uid())));
+CREATE POLICY "Teachers can update their own data" ON teachers
+  FOR UPDATE USING (auth.uid() = (SELECT user_id FROM user_roles WHERE profile_id = teachers.id AND role = 'teacher'));
 
 -- RLS Policies for students
-CREATE POLICY "Teachers can manage students in their classes" ON students
-  FOR ALL USING (class_id IN (SELECT id FROM classes WHERE teacher_id = get_user_profile_id(auth.uid())));
-
 CREATE POLICY "Students can view their own data" ON students
-  FOR SELECT USING (id = get_user_profile_id(auth.uid()));
+  FOR SELECT USING (auth.uid() = (SELECT user_id FROM user_roles WHERE profile_id = students.id AND role = 'student'));
 
 CREATE POLICY "Students can update their own data" ON students
-  FOR UPDATE USING (id = get_user_profile_id(auth.uid()));
+  FOR UPDATE USING (auth.uid() = (SELECT user_id FROM user_roles WHERE profile_id = students.id AND role = 'student'));
 
--- RLS Policies for user_roles
-CREATE POLICY "Users can view their own role" ON user_roles
-  FOR SELECT USING (user_id = auth.uid());
+-- RLS Policies for classes
+CREATE POLICY "Teachers can view their own classes" ON classes
+  FOR SELECT USING (auth.uid() = (SELECT user_id FROM user_roles WHERE profile_id = teacher_id AND role = 'teacher'));
+
+CREATE POLICY "Teachers can manage their own classes" ON classes
+  FOR ALL USING (auth.uid() = (SELECT user_id FROM user_roles WHERE profile_id = teacher_id AND role = 'teacher'));
 
 -- RLS Policies for quizzes
-CREATE POLICY "Teachers can manage their quizzes" ON quizzes
-  FOR ALL USING (created_by = get_user_profile_id(auth.uid()));
+CREATE POLICY "Teachers can view their own quizzes" ON quizzes
+  FOR SELECT USING (auth.uid() = (SELECT user_id FROM user_roles WHERE profile_id = created_by AND role = 'teacher'));
 
-CREATE POLICY "Students can view assigned quizzes" ON quizzes
-  FOR SELECT USING (
-    id IN (
-      SELECT quiz_id FROM class_quizzes 
-      WHERE class_id = (SELECT class_id FROM students WHERE id = get_user_profile_id(auth.uid()))
-    )
-  );
+CREATE POLICY "Teachers can manage their own quizzes" ON quizzes
+  FOR ALL USING (auth.uid() = (SELECT user_id FROM user_roles WHERE profile_id = created_by AND role = 'teacher'));
 
 -- RLS Policies for questions
-CREATE POLICY "Teachers can manage questions for their quizzes" ON questions
-  FOR ALL USING (quiz_id IN (SELECT id FROM quizzes WHERE created_by = get_user_profile_id(auth.uid())));
+CREATE POLICY "Teachers can view questions for their quizzes" ON questions
+  FOR SELECT USING (EXISTS (
+    SELECT 1 FROM quizzes 
+    WHERE quizzes.id = quiz_id 
+    AND auth.uid() = (SELECT user_id FROM user_roles WHERE profile_id = created_by AND role = 'teacher')
+  ));
 
-CREATE POLICY "Students can view questions for assigned quizzes" ON questions
-  FOR SELECT USING (
-    quiz_id IN (
-      SELECT quiz_id FROM class_quizzes 
-      WHERE class_id = (SELECT class_id FROM students WHERE id = get_user_profile_id(auth.uid()))
-    )
-  );
+CREATE POLICY "Teachers can manage questions for their quizzes" ON questions
+  FOR ALL USING (EXISTS (
+    SELECT 1 FROM quizzes 
+    WHERE quizzes.id = quiz_id 
+    AND auth.uid() = (SELECT user_id FROM user_roles WHERE profile_id = created_by AND role = 'teacher')
+  ));
 
 -- RLS Policies for user_progress
-CREATE POLICY "Teachers can view progress for their students" ON user_progress
-  FOR SELECT USING (
-    student_id IN (
-      SELECT id FROM students 
-      WHERE class_id IN (SELECT id FROM classes WHERE teacher_id = get_user_profile_id(auth.uid()))
-    )
-  );
+CREATE POLICY "Students can view their own progress" ON user_progress
+  FOR SELECT USING (auth.uid() = (SELECT user_id FROM user_roles WHERE profile_id = student_id AND role = 'student'));
 
-CREATE POLICY "Students can manage their own progress" ON user_progress
-  FOR ALL USING (student_id = get_user_profile_id(auth.uid()));
-
--- RLS Policies for achievements
-CREATE POLICY "Everyone can view achievements" ON achievements FOR SELECT TO authenticated USING (true);
+CREATE POLICY "Students can insert their own progress" ON user_progress
+  FOR INSERT WITH CHECK (auth.uid() = (SELECT user_id FROM user_roles WHERE profile_id = student_id AND role = 'student'));
 
 -- RLS Policies for user_achievements
-CREATE POLICY "Teachers can view achievements for their students" ON user_achievements
-  FOR SELECT USING (
-    student_id IN (
-      SELECT id FROM students 
-      WHERE class_id IN (SELECT id FROM classes WHERE teacher_id = get_user_profile_id(auth.uid()))
-    )
-  );
-
 CREATE POLICY "Students can view their own achievements" ON user_achievements
-  FOR SELECT USING (student_id = get_user_profile_id(auth.uid()));
+  FOR SELECT USING (auth.uid() = (SELECT user_id FROM user_roles WHERE profile_id = student_id AND role = 'student'));
 
-CREATE POLICY "Students can earn achievements" ON user_achievements
-  FOR INSERT WITH CHECK (student_id = get_user_profile_id(auth.uid()));
+-- RLS Policies for achievements (public read)
+CREATE POLICY "Anyone can view achievements" ON achievements
+  FOR SELECT USING (true);
 
 -- RLS Policies for class_quizzes
 CREATE POLICY "Teachers can manage class quiz assignments" ON class_quizzes
-  FOR ALL USING (
-    class_id IN (SELECT id FROM classes WHERE teacher_id = get_user_profile_id(auth.uid()))
-  );
+  FOR ALL USING (EXISTS (
+    SELECT 1 FROM classes 
+    WHERE classes.id = class_id 
+    AND auth.uid() = (SELECT user_id FROM user_roles WHERE profile_id = teacher_id AND role = 'teacher')
+  ));
 
-CREATE POLICY "Students can view their class quiz assignments" ON class_quizzes
-  FOR SELECT USING (
-    class_id = (SELECT class_id FROM students WHERE id = get_user_profile_id(auth.uid()))
-  );
-
--- Insert default achievements
-INSERT INTO achievements (name, description, badge_icon, requirements, points_reward) VALUES
-  ('First Quiz', 'Complete your first quiz', '🎯', '{"quizzes_completed": 1}', 50),
-  ('Quiz Master', 'Complete 10 quizzes', '🏆', '{"quizzes_completed": 10}', 200),
-  ('Perfect Score', 'Get 100% on a quiz', '⭐', '{"perfect_scores": 1}', 100),
-  ('Speed Demon', 'Complete a quiz in under 2 minutes', '⚡', '{"fast_completion": 120}', 150),
-  ('Streak Keeper', 'Maintain a 7-day streak', '🔥', '{"daily_streak": 7}', 300),
-  ('Persistent Learner', 'Login for 30 consecutive days', '📚', '{"login_streak": 30}', 500);
-
--- Create function to update student level based on points
-CREATE OR REPLACE FUNCTION update_student_level()
-RETURNS TRIGGER AS $$
-BEGIN
-  NEW.level = FLOOR(NEW.total_points / 100) + 1;
-  NEW.updated_at = NOW();
-  RETURN NEW;
-END;
-$$ LANGUAGE plpgsql;
-
--- Create trigger to auto-update level when points change
-CREATE TRIGGER update_level_on_points_change
-  BEFORE UPDATE ON students
-  FOR EACH ROW
-  WHEN (OLD.total_points IS DISTINCT FROM NEW.total_points)
-  EXECUTE FUNCTION update_student_level();
-
--- Create function to handle new user signup
-CREATE OR REPLACE FUNCTION handle_new_user()
-RETURNS TRIGGER AS $$
-BEGIN
-  -- This will be called when a user signs up
-  -- The role and profile creation will be handled in the application
-  RETURN NEW;
-END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
-
--- Create trigger for new user signup
-CREATE TRIGGER on_auth_user_created
-  AFTER INSERT ON auth.users
-  FOR EACH ROW EXECUTE FUNCTION handle_new_user();
+-- RLS Policies for user_roles
+CREATE POLICY "Users can view their own role" ON user_roles
+  FOR SELECT USING (auth.uid() = user_id);

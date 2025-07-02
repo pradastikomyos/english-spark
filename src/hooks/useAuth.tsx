@@ -1,10 +1,10 @@
 
 import { useState, useEffect, createContext, useContext, ReactNode } from 'react';
 import { User } from '@supabase/supabase-js';
-import { supabase } from '@/integrations/supabase/client';
+import { supabase } from '@/lib/supabase';
 import { useToast } from '@/hooks/use-toast';
 
-type UserRole = 'student' | 'teacher';
+type UserRole = 'student' | 'teacher' | 'admin';
 
 interface AuthContextType {
   user: User | null;
@@ -13,7 +13,6 @@ interface AuthContextType {
   profileId: string | null;
   loading: boolean;
   signIn: (email: string, password: string) => Promise<void>;
-  signUp: (email: string, password: string, name: string, role: UserRole) => Promise<void>;
   signOut: () => Promise<void>;
 }
 
@@ -26,32 +25,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
 
-  useEffect(() => {
-    // Get initial session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setUser(session?.user ?? null);
-      if (session?.user) {
-        fetchUserRole(session.user.id);
-      } else {
-        setLoading(false);
-      }
-    });
-
-    // Listen for auth changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUser(session?.user ?? null);
-      if (session?.user) {
-        fetchUserRole(session.user.id);
-      } else {
-        setRole(null);
-        setProfileId(null);
-        setLoading(false);
-      }
-    });
-
-    return () => subscription.unsubscribe();
-  }, []);
-
+  // This function fetches the user's role from the database.
   const fetchUserRole = async (userId: string) => {
     try {
       const { data, error } = await supabase
@@ -62,14 +36,53 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       if (error) throw error;
 
-      setRole(data.role as UserRole);
-      setProfileId(data.profile_id);
+      if (data) {
+        setRole(data.role as UserRole);
+        setProfileId(data.profile_id);
+      }
     } catch (error) {
       console.error('Error fetching user role:', error);
+      setRole(null);
+      setProfileId(null);
     } finally {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    // 1. Get the initial session
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session) {
+        setUser(session.user);
+        fetchUserRole(session.user.id);
+      } else {
+        setLoading(false);
+      }
+    });
+
+    // 2. Set up a listener for auth state changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      // Only update state if the user has actually changed
+      if (session?.user?.id !== user?.id) {
+        setUser(session?.user ?? null);
+      }
+      
+      // If there's a new session, fetch the role. If not, clear everything.
+      if (session?.user) {
+        fetchUserRole(session.user.id);
+      } else {
+        setRole(null);
+        setProfileId(null);
+        setLoading(false);
+      }
+    });
+
+    return () => {
+      subscription.unsubscribe();
+    };
+  // We only want this to run once, but we need to reference the latest `user` state.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id]);
 
   const signIn = async (email: string, password: string): Promise<void> => {
     try {
@@ -84,76 +97,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         title: 'Success',
         description: 'Signed in successfully!',
       });
-    } catch (error: any) {
-      toast({
-        title: 'Error',
-        description: error.message,
-        variant: 'destructive',
-      });
-      throw error;
-    }
-  };
-
-  const signUp = async (email: string, password: string, name: string, userRole: UserRole): Promise<void> => {
-    try {
-      const { data, error } = await supabase.auth.signUp({
-        email,
-        password,
-        options: {
-          data: {
-            name,
-            role: userRole,
-          }
-        }
-      });
-
-      if (error) throw error;
-
-      if (data.user) {
-        let profileId: string;
-
-        if (userRole === 'teacher') {
-          const { data: teacherData, error: teacherError } = await supabase
-            .from('teachers')
-            .insert({
-              user_id: data.user.id,
-              name,
-              email,
-            })
-            .select()
-            .single();
-
-          if (teacherError) throw teacherError;
-          profileId = teacherData.id;
-        } else {
-          const { data: studentData, error: studentError } = await supabase
-            .from('students')
-            .insert({
-              user_id: data.user.id,
-              name,
-              email,
-              student_id: `STU${Date.now()}`,
-            })
-            .select()
-            .single();
-
-          if (studentError) throw studentError;
-          profileId = studentData.id;
-        }
-
-        await supabase
-          .from('user_roles')
-          .insert({
-            user_id: data.user.id,
-            role: userRole,
-            profile_id: profileId,
-          });
-
-        toast({
-          title: 'Success',
-          description: 'Account created successfully!',
-        });
-      }
     } catch (error: any) {
       toast({
         title: 'Error',
@@ -191,7 +134,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         profileId,
         loading,
         signIn,
-        signUp,
         signOut,
       }}
     >

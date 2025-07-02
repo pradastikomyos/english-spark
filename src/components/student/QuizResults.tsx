@@ -4,7 +4,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
-import { supabase } from '@/integrations/supabase/client';
+import { supabase } from '@/lib/supabase';
 import { 
   Trophy, 
   Target, 
@@ -57,6 +57,28 @@ export function QuizResults() {
   useEffect(() => {
     if (profileId) {
       fetchResults();
+
+      const channel = supabase
+        .channel(`quiz_results:${profileId}`)
+        .on(
+          'postgres_changes',
+          { 
+            event: 'INSERT', 
+            schema: 'public', 
+            table: 'user_progress',
+            filter: `student_id=eq.${profileId}`
+          },
+          (payload) => {
+            console.log('New quiz result received!', payload);
+            // Re-fetch results to update the view
+            fetchResults();
+          }
+        )
+        .subscribe();
+
+      return () => {
+        supabase.removeChannel(channel);
+      };
     }
   }, [profileId]);
 
@@ -73,8 +95,6 @@ export function QuizResults() {
           total_questions,
           time_taken,
           completed_at,
-          correct_answers,
-          points_earned,
           quizzes!inner(title, difficulty, total_questions)
         `)
         .eq('student_id', profileId)
@@ -83,10 +103,12 @@ export function QuizResults() {
       if (error) throw error;
 
       const formattedResults = data?.map(result => {
+        // Manually calculate correct_answers as it's not in the DB
+        const correctAnswers = Math.round((result.score / 100) * result.total_questions);
+
         // Calculate difficulty breakdown based on quiz structure
         const totalQuestions = result.quizzes?.total_questions || 30;
         const questionsPerDifficulty = Math.floor(totalQuestions / 3);
-        const correctAnswers = result.correct_answers || 0;
         
         // Estimate breakdown (in real implementation, store this data)
         const difficultyBreakdown = {
@@ -107,10 +129,14 @@ export function QuizResults() {
           }
         };
 
+        const points_earned = difficultyBreakdown.easy.points + difficultyBreakdown.medium.points + difficultyBreakdown.hard.points;
+
         return {
           ...result,
           quiz_title: result.quizzes?.title || 'Unknown Quiz',
           quiz_difficulty: result.quizzes?.difficulty || 'medium',
+          correct_answers: correctAnswers,
+          points_earned: points_earned,
           difficulty_breakdown: difficultyBreakdown
         };
       }) || [];
@@ -389,7 +415,7 @@ export function QuizResults() {
                       <div className="flex justify-between text-sm mb-1">
                         <span>Overall Progress</span>
                         <span className={getScoreColor(result.score)}>
-                          {result.score}% ({result.correct_answers || 0}/{result.total_questions} correct)
+                          {result.score}% ({Math.round((result.score / 100) * result.total_questions)}/{result.total_questions} correct)
                         </span>
                       </div>
                       <Progress value={result.score} className="h-2" />

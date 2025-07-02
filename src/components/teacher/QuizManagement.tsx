@@ -19,7 +19,7 @@ import {
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Badge } from "@/components/ui/badge";
 import { useToast } from '@/hooks/use-toast';
-import { supabase } from '@/integrations/supabase/client';
+import { supabase } from '@/lib/supabase';
 import { Plus, FileText, Clock, Award, Edit, Trash2, Sparkles, Loader2, Settings } from 'lucide-react';
 import { QuestionManager } from './QuestionManager';
 // import { QuizGenerator } from './QuizGenerator';
