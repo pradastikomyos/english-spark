@@ -29,6 +29,7 @@ export function TeacherLayout({ children, currentPage, onPageChange, sidebarOpen
   const { signOut } = useAuth();
   const navigation = [
     { name: 'Dashboard', id: 'dashboard', icon: LayoutDashboard },
+    { name: 'Students', id: 'students', icon: Users },
     { name: 'Quizzes', id: 'quizzes', icon: FileText },
     { name: 'Materials', id: 'materials', icon: BookOpen },
     { name: 'Assignment', id: 'assignment', icon: Send },

@@ -12,7 +12,11 @@ security definer set search_path = public
 as $$
 begin
     -- Ensure the user is authorized to view the scores
-    if auth.uid() <> p_teacher_id then
+    if not exists (
+        select 1
+        from teachers t
+        where t.id = p_teacher_id and t.user_id = auth.uid()
+    ) then
         raise exception 'You are not authorized to view these scores.';
     end if;
 

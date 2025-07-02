@@ -6,6 +6,7 @@ import { QuizAssignment } from '@/components/teacher/QuizAssignment';
 import Reports from '@/components/teacher/Reports';
 import MaterialManagement from '@/components/teacher/MaterialManagement';
 import Settings from '@/components/teacher/Settings';
+import { StudentList } from '@/components/teacher/StudentList';
 import { useIsMobile } from '@/hooks/use-mobile';
 
 export default function TeacherPortal() {
@@ -23,6 +24,8 @@ export default function TeacherPortal() {
     switch (currentPage) {
       case 'dashboard':
         return <TeacherDashboard />;
+      case 'students':
+        return <StudentList />;
       case 'quizzes':
         return <QuizManagement />;
       case 'assignment':
