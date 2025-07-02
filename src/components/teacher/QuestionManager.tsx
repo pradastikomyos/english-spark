@@ -33,9 +33,10 @@ interface QuestionManagerProps {
   quizTitle?: string;
   onClose?: () => void;
   onBack?: () => void;
+  isAdmin?: boolean;
 }
 
-export function QuestionManager({ quizId, quizTitle, onClose, onBack }: QuestionManagerProps) {
+export function QuestionManager({ quizId, quizTitle, onClose, onBack, isAdmin = false }: QuestionManagerProps) {
   const { profileId } = useAuth();
   const { toast } = useToast();
   const [questions, setQuestions] = useState<Question[]>([]);
@@ -68,11 +69,15 @@ export function QuestionManager({ quizId, quizTitle, onClose, onBack }: Question
       setLoading(true);
       console.log('🔍 Fetching questions for quiz:', quizId);
       
-      const { data, error } = await supabase
-        .from('questions')
-        .select('*, media_url') // Include media_url in the select query
-        .eq('quiz_id', quizId)
-        .order('question_order', { ascending: true });
+      const query = isAdmin
+        ? supabase.rpc('get_questions_for_quiz_admin', { p_quiz_id: quizId })
+        : supabase
+            .from('questions')
+            .select('*, media_url')
+            .eq('quiz_id', quizId)
+            .order('question_order', { ascending: true });
+
+      const { data, error } = await query;
 
       if (error) throw error;
         console.log('📝 Quiz questions:', data);
@@ -120,19 +125,32 @@ export function QuestionManager({ quizId, quizTitle, onClose, onBack }: Question
         'D': questionForm.option_d,
       };
 
-      const { data, error } = await supabase
-        .from('questions')
-        .update({
-          question_text: questionForm.question_text,
-          options: optionsObject,
-          correct_answer: questionForm.correct_answer,
-          explanation: questionForm.explanation,
-          points: questionForm.points,
-          difficulty: questionForm.difficulty,
-        })
-        .eq('id', currentQuestion.id)
-        .select()
-        .single();
+      const query = isAdmin
+        ? supabase.rpc('update_question_admin', {
+            p_question_id: currentQuestion.id,
+            p_question_text: questionForm.question_text,
+            p_options: optionsObject,
+            p_correct_answer: questionForm.correct_answer,
+            p_explanation: questionForm.explanation,
+            p_points: questionForm.points,
+            p_difficulty: questionForm.difficulty,
+            p_media_url: currentQuestion.media_url, // media_url is not editable in this form, so pass the existing one
+          })
+        : supabase
+            .from('questions')
+            .update({
+              question_text: questionForm.question_text,
+              options: optionsObject,
+              correct_answer: questionForm.correct_answer,
+              explanation: questionForm.explanation,
+              points: questionForm.points,
+              difficulty: questionForm.difficulty,
+            })
+            .eq('id', currentQuestion.id)
+            .select()
+            .single();
+
+      const { data, error } = await query;
  
       if (error) throw error;
       
@@ -163,10 +181,11 @@ export function QuestionManager({ quizId, quizTitle, onClose, onBack }: Question
     try {
       console.log('🗑️ Deleting question:', questionToDelete.id);
       
-      const { error } = await supabase
-        .from('questions')
-        .delete()
-        .eq('id', questionToDelete.id);
+      const query = isAdmin
+        ? supabase.rpc('delete_question_admin', { p_question_id: questionToDelete.id })
+        : supabase.from('questions').delete().eq('id', questionToDelete.id);
+
+      const { error } = await query;
  
       if (error) throw error;
       
@@ -311,6 +330,7 @@ export function QuestionManager({ quizId, quizTitle, onClose, onBack }: Question
               isOpen={isCreateQuestionDialogOpen}
               onClose={() => setIsCreateQuestionDialogOpen(false)}
               onQuestionCreated={fetchQuestions}
+              isAdmin={isAdmin}
             />
           </Dialog>
           

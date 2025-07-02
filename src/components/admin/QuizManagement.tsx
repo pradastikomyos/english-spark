@@ -19,7 +19,9 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 import { Badge } from "@/components/ui/badge";
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/lib/supabase';
-import { Plus, FileText, Clock, Edit, Trash2, Loader2, User } from 'lucide-react';
+import { Plus, FileText, Clock, Edit, Trash2, Loader2, User, BookOpen, Send } from 'lucide-react';
+import { Checkbox } from '@/components/ui/checkbox';
+import { QuestionManager } from '../teacher/QuestionManager';
 
 // Interface untuk objek Kuis dari perspektif Admin
 interface Quiz {
@@ -37,6 +39,12 @@ interface QuizFormState {
   description: string;
 }
 
+interface Class {
+  id: string;
+  name: string;
+  student_count?: number;
+}
+
 export default function AdminQuizManagement() {
   const { toast } = useToast();
   const [quizzes, setQuizzes] = useState<Quiz[]>([]);
@@ -51,9 +59,15 @@ export default function AdminQuizManagement() {
   const [currentQuiz, setCurrentQuiz] = useState<Quiz | null>(null);
   const [quizToDelete, setQuizToDelete] = useState<Quiz | null>(null);
   const [quizForm, setQuizForm] = useState<QuizFormState>({ title: '', description: '' });
+  const [managingQuiz, setManagingQuiz] = useState<Quiz | null>(null);
+  const [isAssignDialogOpen, setIsAssignDialogOpen] = useState(false);
+  const [quizToAssign, setQuizToAssign] = useState<Quiz | null>(null);
+  const [allClasses, setAllClasses] = useState<Class[]>([]);
+  const [selectedClasses, setSelectedClasses] = useState<string[]>([]);
 
   useEffect(() => {
     fetchQuizzes();
+    fetchAllClasses();
   }, []);
 
   const fetchQuizzes = async () => {
@@ -125,6 +139,28 @@ export default function AdminQuizManagement() {
     }
   };
 
+  const fetchAllClasses = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('classes')
+        .select('id, name, students:students(count)');
+
+      if (error) throw error;
+
+      const classesWithCounts = (data || []).map((cls: any) => ({
+        ...cls,
+        student_count: cls.students?.[0]?.count || 0,
+      }));
+      setAllClasses(classesWithCounts);
+    } catch (error: any) {
+      toast({
+        title: 'Error Fetching Classes',
+        description: error.message,
+        variant: 'destructive',
+      });
+    }
+  };
+
   const resetForm = () => {
     setQuizForm({ title: '', description: '' });
   };
@@ -185,6 +221,29 @@ export default function AdminQuizManagement() {
     }
   };
 
+  const handleAssignQuiz = async () => {
+    if (!quizToAssign || selectedClasses.length === 0) {
+      toast({ title: 'Error', description: 'Please select a quiz and at least one class.', variant: 'destructive' });
+      return;
+    }
+
+    try {
+      const { error } = await supabase.rpc('assign_quiz_to_classes_admin', {
+        p_quiz_id: quizToAssign.id,
+        p_class_ids: selectedClasses,
+      });
+
+      if (error) throw error;
+
+      toast({ title: 'Success', description: `Quiz "${quizToAssign.title}" assigned to ${selectedClasses.length} class(es).` });
+      setIsAssignDialogOpen(false);
+      setQuizToAssign(null);
+      setSelectedClasses([]);
+    } catch (error: any) {
+      toast({ title: 'Assignment Failed', description: error.message, variant: 'destructive' });
+    }
+  };
+
   // --- Pembuka Dialog ---
   const openCreateDialog = () => {
     resetForm();
@@ -202,6 +261,12 @@ export default function AdminQuizManagement() {
     setIsDeleteConfirmOpen(true);
   };
 
+  const openAssignDialog = (quiz: Quiz) => {
+    setQuizToAssign(quiz);
+    setSelectedClasses([]);
+    setIsAssignDialogOpen(true);
+  };
+
   // --- Render ---
   if (loading) {
     return (
@@ -209,6 +274,17 @@ export default function AdminQuizManagement() {
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
         <p className="ml-4 text-lg">Loading Quizzes...</p>
       </div>
+    );
+  }
+
+  if (managingQuiz) {
+    return (
+      <QuestionManager
+        quizId={managingQuiz.id}
+        quizTitle={managingQuiz.title}
+        onBack={() => setManagingQuiz(null)}
+        isAdmin={true}
+      />
     );
   }
 
@@ -254,7 +330,9 @@ export default function AdminQuizManagement() {
                      <span>{quiz.questionCount} Questions</span>
                   </div>
                 </CardContent>
-                <CardFooter className="flex justify-end gap-2">
+                <CardFooter className="flex justify-end gap-2 flex-wrap">
+                  <Button variant="default" size="sm" onClick={() => openAssignDialog(quiz)}><Send className="mr-2 h-4 w-4"/>Assign</Button>
+                  <Button variant="secondary" size="sm" onClick={() => setManagingQuiz(quiz)}><BookOpen className="mr-2 h-4 w-4"/>Manage Questions</Button>
                   <Button variant="outline" size="sm" onClick={() => openEditDialog(quiz)}><Edit className="mr-2 h-4 w-4"/>Edit</Button>
                   <Button variant="destructive" size="sm" onClick={() => openDeleteDialog(quiz)}><Trash2 className="mr-2 h-4 w-4"/>Delete</Button>
                 </CardFooter>
@@ -322,6 +400,40 @@ export default function AdminQuizManagement() {
                 </AlertDialogFooter>
             </AlertDialogContent>
         </AlertDialog>
+
+        {/* Assign Quiz Dialog */}
+        <Dialog open={isAssignDialogOpen} onOpenChange={setIsAssignDialogOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Assign Quiz: {quizToAssign?.title}</DialogTitle>
+              <DialogDescription>Select the classes to assign this quiz to.</DialogDescription>
+            </DialogHeader>
+            <div className="py-4">
+              <div className="space-y-2 max-h-60 overflow-y-auto">
+                {allClasses.map((cls) => (
+                  <div key={cls.id} className="flex items-center space-x-2 p-2 rounded-md hover:bg-muted">
+                    <Checkbox
+                      id={`class-${cls.id}`}
+                      checked={selectedClasses.includes(cls.id)}
+                      onCheckedChange={(checked) => {
+                        setSelectedClasses(prev => 
+                          checked ? [...prev, cls.id] : prev.filter(id => id !== cls.id)
+                        );
+                      }}
+                    />
+                    <Label htmlFor={`class-${cls.id}`} className="flex-1 cursor-pointer">
+                      {cls.name} ({cls.student_count || 0} students)
+                    </Label>
+                  </div>
+                ))}
+              </div>
+            </div>
+            <DialogFooter>
+              <Button type="button" variant="ghost" onClick={() => setIsAssignDialogOpen(false)}>Cancel</Button>
+              <Button type="button" onClick={handleAssignQuiz}>Assign to {selectedClasses.length} Class(es)</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
 
       </div>
     </TooltipProvider>

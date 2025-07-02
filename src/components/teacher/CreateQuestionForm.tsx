@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Textarea } from '@/components/ui/textarea';
 
 interface Option {
   text: string;
@@ -16,9 +17,10 @@ interface CreateQuestionFormProps {
   isOpen: boolean;
   onClose: () => void;
   onQuestionCreated: () => void;
+  isAdmin?: boolean;
 }
 
-const CreateQuestionForm = ({ quizId, isOpen, onClose, onQuestionCreated }: CreateQuestionFormProps) => {
+const CreateQuestionForm = ({ quizId, isOpen, onClose, onQuestionCreated, isAdmin = false }: CreateQuestionFormProps) => {
   const [questionName, setQuestionName] = useState('');
   const [difficulty, setDifficulty] = useState('easy');
   const [points, setPoints] = useState(2);
@@ -30,6 +32,7 @@ const CreateQuestionForm = ({ quizId, isOpen, onClose, onQuestionCreated }: Crea
   ]);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [youtubeUrl, setYoutubeUrl] = useState('');
+  const [explanation, setExplanation] = useState('');
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -106,24 +109,36 @@ const CreateQuestionForm = ({ quizId, isOpen, onClose, onQuestionCreated }: Crea
         throw new Error('Please select a correct option for the question.');
       }
 
-      const { data: questionData, error: questionError } = await supabase
-        .from('questions')
-        .insert({
-          quiz_id: quizId,
-          question_text: questionName,
-          difficulty: difficulty,
-          points: points,
-          media_url: mediaUrl, // Save the URL here
-          correct_answer: correct_answer_char, // Save the correct answer character
-          options: options.reduce((acc, opt, idx) => {
-            if (opt.text.trim() !== '') {
-              acc[String.fromCharCode(65 + idx)] = opt.text;
-            }
-            return acc;
-          }, {} as Record<string, string>), // Save options as JSON object
-        })
-        .select('id')
-        .single();
+      const optionsObject = options.reduce((acc, opt, idx) => {
+        if (opt.text.trim() !== '') {
+          acc[String.fromCharCode(65 + idx)] = opt.text;
+        }
+        return acc;
+      }, {} as Record<string, string>);
+
+      const query = isAdmin
+        ? supabase.rpc('create_question_admin', {
+            p_quiz_id: quizId,
+            p_question_text: questionName,
+            p_options: optionsObject,
+            p_correct_answer: correct_answer_char,
+            p_explanation: explanation,
+            p_points: points,
+            p_difficulty: difficulty,
+            p_media_url: mediaUrl,
+          })
+        : supabase.from('questions').insert({
+            quiz_id: quizId,
+            question_text: questionName,
+            difficulty: difficulty,
+            points: points,
+            media_url: mediaUrl,
+            correct_answer: correct_answer_char,
+            options: optionsObject,
+            explanation: explanation,
+          });
+
+      const { error: questionError } = await query;
 
       if (questionError) {
         throw questionError;
@@ -169,6 +184,13 @@ const CreateQuestionForm = ({ quizId, isOpen, onClose, onQuestionCreated }: Crea
                 YouTube URL
               </Label>
               <Input id="youtube" value={youtubeUrl} onChange={(e) => setYoutubeUrl(e.target.value)} className="col-span-3" placeholder="e.g., https://www.youtube.com/watch?v=..." />
+            </div>
+
+            <div className="grid grid-cols-4 items-start gap-4">
+              <Label htmlFor="explanation" className="text-right pt-2">
+                Explanation
+              </Label>
+              <Textarea id="explanation" value={explanation} onChange={(e) => setExplanation(e.target.value)} className="col-span-3" placeholder="Explain why the correct answer is right..." />
             </div>
 
             <div className="grid grid-cols-4 items-center gap-4">

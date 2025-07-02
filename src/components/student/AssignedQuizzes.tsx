@@ -76,60 +76,18 @@ export function AssignedQuizzes({ onStartQuiz, onReviewQuiz }: AssignedQuizzesPr
   const fetchAssignedQuizzes = async () => {
     try {
       setLoading(true);
+      const { data, error } = await supabase.rpc('get_assigned_quizzes_for_student');
 
-      // First get student's class_id
-      const { data: studentData, error: studentError } = await supabase
-        .from('students')
-        .select('class_id')
-        .eq('id', profileId)
-        .single();
+      if (error) throw error;
 
-      if (studentError) throw studentError;
-
-      if (!studentData?.class_id) {
-        setAssignments([]);
-        return;
-      }
-
-      // Get assigned quizzes for student's class
-      const { data: assignmentsData, error: assignmentsError } = await supabase
-        .from('class_quizzes')
-        .select(`
-          id,
-          quiz_id,
-          class_id,
-          assigned_at,
-          due_date,
-          quiz:quizzes!inner(
-            id,
-            title,
-            description,
-            difficulty,
-            time_limit,
-            points_per_question,
-            status
-          )
-        `)
-        .eq('class_id', studentData.class_id)
-        .order('assigned_at', { ascending: false });
-
-      if (assignmentsError) throw assignmentsError;      // Get completion status for each quiz
-      const quizIds = assignmentsData?.map(a => a.quiz_id) || [];
-      const { data: completionsData } = await supabase
-        .from('user_progress')
-        .select('id, quiz_id, score, completed_at, total_questions, time_taken')
-        .eq('student_id', profileId)
-        .in('quiz_id', quizIds);
-
-      // Combine assignments with completion data
-      const enrichedAssignments = assignmentsData?.map(assignment => ({
+      const enrichedAssignments = (data || []).map((assignment: any) => ({
         ...assignment,
         quiz: {
           ...assignment.quiz,
-          status: (assignment.quiz.status || 'open') as 'open' | 'closed', // fallback jika status null
+          status: (assignment.quiz.status || 'open') as 'open' | 'closed',
         },
-        completion: completionsData?.find(c => c.quiz_id === assignment.quiz_id)
-      })) || [];
+        completion: assignment.completion,
+      }));
 
       setAssignments(enrichedAssignments);
 

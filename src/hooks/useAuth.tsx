@@ -50,39 +50,45 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   useEffect(() => {
-    // 1. Get the initial session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session) {
-        setUser(session.user);
-        fetchUserRole(session.user.id);
+    setLoading(true);
+
+    const handleSession = async (session: import('@supabase/supabase-js').Session | null) => {
+      if (session && session.user) {
+        // Check if the user is the same to avoid redundant fetches
+        if (user?.id !== session.user.id) {
+          setUser(session.user);
+          await fetchUserRole(session.user.id);
+        }
       } else {
-        setLoading(false);
+        setUser(null);
+        setRole(null);
+        setProfileId(null);
+      }
+      setLoading(false);
+    };
+
+    // 1. Check the initial session
+    supabase.auth.getSession().then(({ data: { session }, error }) => {
+      if (error) {
+        console.error('Error getting session on initial load:', error.message);
+        // If the refresh token is invalid, force a sign out to clear everything.
+        supabase.auth.signOut();
+        handleSession(null);
+      } else {
+        handleSession(session);
       }
     });
 
     // 2. Set up a listener for auth state changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      // Only update state if the user has actually changed
-      if (session?.user?.id !== user?.id) {
-        setUser(session?.user ?? null);
-      }
-      
-      // If there's a new session, fetch the role. If not, clear everything.
-      if (session?.user) {
-        fetchUserRole(session.user.id);
-      } else {
-        setRole(null);
-        setProfileId(null);
-        setLoading(false);
-      }
+      handleSession(session);
     });
 
     return () => {
       subscription.unsubscribe();
     };
-  // We only want this to run once, but we need to reference the latest `user` state.
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user?.id]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Run only once on mount
 
   const signIn = async (email: string, password: string): Promise<void> => {
     try {

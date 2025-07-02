@@ -1,21 +1,36 @@
-
 import { useEffect, useState } from 'react';
 import { useAuth, AuthProvider } from '@/hooks/useAuth';
 import { AuthForm } from '@/components/auth/AuthForm';
 import AdminPortal from '@/pages/AdminPortal';
 import TeacherPortal from '@/pages/TeacherPortal';
 import StudentPortal from '@/pages/StudentPortal';
+import QuizTaking from '@/components/student/QuizTaking'; // Import QuizTaking
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
+import { BrowserRouter, Routes, Route, Navigate, useNavigate } from 'react-router-dom'; // Import routing components
 
 const queryClient = new QueryClient();
 
 function AppContent() {
   const { user, userRole, loading } = useAuth();
   const [loadingTimeout, setLoadingTimeout] = useState(false);
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    if (userRole) {
+      if (userRole === 'admin') {
+        navigate('/admin');
+      } else if (userRole === 'teacher') {
+        navigate('/teacher');
+      } else if (userRole === 'student') {
+        navigate('/student');
+      }
+    }
+  }, [userRole, navigate]);
+
   useEffect(() => {
     if (loading) {
       // Set timeout for loading state - reduced to 3 seconds
@@ -60,25 +75,15 @@ function AppContent() {
     return <AuthForm />;
   }
 
-  if (userRole === 'admin') {
-    return <AdminPortal />;
-  }
-
-  if (userRole === 'teacher') {
-    return <TeacherPortal />;
-  }
-
-  if (userRole === 'student') {
-    return <StudentPortal />;
-  }
-
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-green-50">
-      <div className="text-center">
-        <h1 className="text-2xl font-bold text-gray-900 mb-4">Setting up your account...</h1>
-        <p className="text-gray-600">Please wait while we configure your profile.</p>
-      </div>
-    </div>
+    <Routes>
+      <Route path="/admin/*" element={userRole === 'admin' ? <AdminPortal /> : <Navigate to="/" />} />
+      <Route path="/teacher/*" element={userRole === 'teacher' ? <TeacherPortal /> : <Navigate to="/" />} />
+      <Route path="/student/*" element={userRole === 'student' ? <StudentPortal /> : <Navigate to="/" />} />
+      <Route path="/student/quiz-taking/:quizId" element={userRole === 'student' ? <QuizTaking /> : <Navigate to="/" />} />
+      <Route path="/" element={<AuthForm />} /> {/* Default route for login */}
+      <Route path="*" element={<Navigate to="/" />} /> {/* Catch-all for unknown routes */}
+    </Routes>
   );
 }
 
@@ -88,7 +93,9 @@ const App = () => (
       <AuthProvider>
         <Toaster />
         <Sonner />
-        <AppContent />
+        <BrowserRouter> {/* Wrap AppContent with BrowserRouter */}
+          <AppContent />
+        </BrowserRouter>
       </AuthProvider>
     </TooltipProvider>
   </QueryClientProvider>

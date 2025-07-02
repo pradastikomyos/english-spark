@@ -1,131 +1,151 @@
-import React from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, LineChart, Line, PieChart, Pie, Cell } from 'recharts';
+import React, { useState, useEffect } from 'react';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { useAuth } from '@/hooks/useAuth';
+import { supabase } from '@/lib/supabase';
+import { useToast } from '@/hooks/use-toast';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import { Trophy, BookOpen, UserCheck } from 'lucide-react';
 
-const overallPerformanceData = [
-  { name: 'Jan', score: 65 },
-  { name: 'Feb', score: 72 },
-  { name: 'Mar', score: 78 },
-  { name: 'Apr', score: 85 },
-  { name: 'May', score: 82 },
-  { name: 'Jun', score: 88 },
-];
+interface StudentScore {
+  student_id: string;
+  student_name: string;
+  quiz_id: string;
+  quiz_title: string;
+  score: number;
+  submitted_at: string;
+}
 
-const completionRateData = [
-  { name: 'Completed', value: 400 },
-  { name: 'Not Completed', value: 100 },
-];
-
-const COLORS = ['#0088FE', '#FF8042'];
-
-const difficultyPerformanceData = [
-  { name: 'Easy', score: 92 },
-  { name: 'Medium', score: 78 },
-  { name: 'Hard', score: 65 },
-];
-
-const topStudentsData = [
-  { id: 1, name: 'Alice', score: 95 },
-  { id: 2, name: 'Bob', score: 92 },
-  { id: 3, name: 'Charlie', score: 90 },
-  { id: 4, name: 'David', score: 88 },
-  { id: 5, name: 'Eve', score: 85 },
-];
+interface LeaderboardStudent {
+  student_id: string;
+  student_name: string;
+  total_score: number;
+  class_name: string;
+}
 
 const Reports: React.FC = () => {
+  const { profileId } = useAuth();
+  const { toast } = useToast();
+  const [studentScores, setStudentScores] = useState<StudentScore[]>([]);
+  const [leaderboard, setLeaderboard] = useState<LeaderboardStudent[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (profileId) {
+      fetchReportsData();
+    }
+  }, [profileId]);
+
+  const fetchReportsData = async () => {
+    setLoading(true);
+    try {
+      const [scoresRes, leaderboardRes] = await Promise.all([
+        supabase.rpc('get_student_scores_for_teacher', { p_teacher_id: profileId }),
+        supabase.rpc('get_leaderboard_for_teacher', { p_teacher_id: profileId })
+      ]);
+
+      if (scoresRes.error) throw scoresRes.error;
+      setStudentScores(scoresRes.data || []);
+
+      if (leaderboardRes.error) throw leaderboardRes.error;
+      setLeaderboard(leaderboardRes.data || []);
+
+    } catch (error: any) {
+      console.error('Error fetching reports data:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to fetch reports data.',
+        variant: 'destructive',
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <div className="p-6 space-y-6">
       <h1 className="text-3xl font-bold">Reports</h1>
       
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <Card>
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Leaderboard Card (takes 1/3 width on large screens) */}
+        <Card className="lg:col-span-1">
           <CardHeader>
-            <CardTitle>Overall Performance</CardTitle>
+            <CardTitle className="flex items-center gap-2">
+              <Trophy className="h-5 w-5 text-yellow-500" />
+              Top Performing Students
+            </CardTitle>
+             <CardDescription>Leaderboard of students with the highest total scores.</CardDescription>
           </CardHeader>
           <CardContent>
-            <ResponsiveContainer width="100%" height={300}>
-              <LineChart data={overallPerformanceData}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="name" />
-                <YAxis />
-                <Tooltip />
-                <Legend />
-                <Line type="monotone" dataKey="score" stroke="#8884d8" activeDot={{ r: 8 }} />
-              </LineChart>
-            </ResponsiveContainer>
+            {loading ? (
+              <p>Loading leaderboard...</p>
+            ) : leaderboard.length === 0 ? (
+              <p>No data available to display leaderboard.</p>
+            ) : (
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Rank</TableHead>
+                      <TableHead>Student</TableHead>
+                      <TableHead>Class</TableHead>
+                      <TableHead>Total Score</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {leaderboard.map((student, index) => (
+                      <TableRow key={student.student_id}>
+                        <TableCell className="font-medium">{index + 1}</TableCell>
+                        <TableCell>{student.student_name}</TableCell>
+                        <TableCell>{student.class_name}</TableCell>
+                        <TableCell>{student.total_score}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            )}
           </CardContent>
         </Card>
 
-        <Card>
+        {/* Student Scores Card (takes 2/3 width on large screens) */}
+        <Card className="lg:col-span-2">
           <CardHeader>
-            <CardTitle>Quiz Completion Rate</CardTitle>
+            <CardTitle className="flex items-center gap-2">
+                <UserCheck className="h-5 w-5 text-blue-500" />
+                Student Quiz Submissions
+            </CardTitle>
+            <CardDescription>Detailed scores for each quiz submitted by your students.</CardDescription>
           </CardHeader>
           <CardContent>
-            <ResponsiveContainer width="100%" height={300}>
-              <PieChart>
-                <Pie
-                  data={completionRateData}
-                  cx="50%"
-                  cy="50%"
-                  labelLine={false}
-                  outerRadius={80}
-                  fill="#8884d8"
-                  dataKey="value"
-                >
-                  {completionRateData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                  ))}
-                </Pie>
-                <Tooltip />
-                <Legend />
-              </PieChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Performance by Difficulty</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <ResponsiveContainer width="100%" height={300}>
-              <BarChart data={difficultyPerformanceData}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="name" />
-                <YAxis />
-                <Tooltip />
-                <Legend />
-                <Bar dataKey="score" fill="#82ca9d" />
-              </BarChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Top Performing Students</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Rank</th>
-                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Student</th>
-                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Average Score</th>
-                  </tr>
-                </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
-                  {topStudentsData.map((student, index) => (
-                    <tr key={student.id}>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{index + 1}</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{student.name}</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{student.score}%</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+             {loading ? (
+              <p>Loading scores...</p>
+            ) : studentScores.length === 0 ? (
+              <p>No student submissions found for your assigned quizzes.</p>
+            ) : (
+              <div className="overflow-auto max-h-[600px]">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Student</TableHead>
+                      <TableHead>Quiz Title</TableHead>
+                      <TableHead>Score</TableHead>
+                      <TableHead>Date</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {studentScores.map((score) => (
+                      <TableRow key={`${score.student_id}-${score.quiz_id}-${score.submitted_at}`}>
+                        <TableCell>{score.student_name}</TableCell>
+                        <TableCell>{score.quiz_title}</TableCell>
+                        <TableCell>{score.score}</TableCell>
+                        <TableCell>{new Date(score.submitted_at).toLocaleDateString()}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>
