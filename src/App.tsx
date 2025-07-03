@@ -6,13 +6,12 @@ import { AuthForm } from '@/components/auth/AuthForm';
 import AdminPortal from '@/pages/AdminPortal';
 import TeacherPortal from '@/pages/TeacherPortal';
 import StudentPortal from '@/pages/StudentPortal';
-import QuizTaking from '@/components/student/QuizTaking'; // Import QuizTaking
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
-import { BrowserRouter, Routes, Route, Navigate, useNavigate } from 'react-router-dom'; // Import routing components
+import { Routes, Route, Navigate, useNavigate } from 'react-router-dom'; // Import routing components
 
 const queryClient = new QueryClient();
 
@@ -82,7 +81,6 @@ function AppContent() {
       <Route path="/admin/*" element={role === 'admin' ? <AdminPortal /> : <Navigate to="/" />} />
       <Route path="/teacher/*" element={role === 'teacher' ? <TeacherPortal /> : <Navigate to="/" />} />
       <Route path="/student/*" element={role === 'student' ? <StudentPortal /> : <Navigate to="/" />} />
-      <Route path="/student/quiz-taking/:quizId" element={role === 'student' ? <QuizTaking /> : <Navigate to="/" />} />
       <Route path="/" element={<AuthForm />} /> {/* Default route for login */}
       <Route path="*" element={<Navigate to="/" />} /> {/* Catch-all for unknown routes */}
     </Routes>

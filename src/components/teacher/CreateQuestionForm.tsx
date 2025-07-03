@@ -42,10 +42,10 @@ const CreateQuestionForm = ({ quizId, isOpen, onClose, onQuestionCreated, isAdmi
         setPoints(2);
         break;
       case 'medium':
-        setPoints(5);
+        setPoints(3);
         break;
       case 'hard':
-        setPoints(10);
+        setPoints(5);
         break;
     }
   }, [difficulty]);
@@ -203,8 +203,8 @@ const CreateQuestionForm = ({ quizId, isOpen, onClose, onQuestionCreated, isAdmi
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="easy">Easy (2 pts)</SelectItem>
-                  <SelectItem value="medium">Medium (5 pts)</SelectItem>
-                  <SelectItem value="hard">Hard (10 pts)</SelectItem>
+                  <SelectItem value="medium">Medium (3 pts)</SelectItem>
+                  <SelectItem value="hard">Hard (5 pts)</SelectItem>
                 </SelectContent>
               </Select>
             </div>

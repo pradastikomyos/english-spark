@@ -1,5 +1,4 @@
 import { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '@/lib/supabase';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -10,7 +9,7 @@ import { Progress } from '@/components/ui/progress';
 // Define types for our data
 interface Question {
   id: string;
-  text: string;
+  question_text: string;
   media_url: string | null;
   options: Record<string, string>;
   points: number;
@@ -23,9 +22,12 @@ interface Quiz {
     description: string;
 }
 
-const QuizTaking = () => {
-  const { quizId } = useParams<{ quizId: string }>();
-  const navigate = useNavigate();
+interface QuizTakingProps {
+  quizId: string;
+  onFinishQuiz: () => void;
+}
+
+const QuizTaking = ({ quizId, onFinishQuiz }: QuizTakingProps) => {
   const [quiz, setQuiz] = useState<Quiz | null>(null);
   const [questions, setQuestions] = useState<Question[]>([]);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
@@ -36,7 +38,11 @@ const QuizTaking = () => {
 
   useEffect(() => {
     const fetchQuizData = async () => {
-      if (!quizId) return;
+      if (!quizId) {
+        setError('Quiz ID is missing.');
+        setIsLoading(false);
+        return;
+      }
       setIsLoading(true);
       try {
         // Fetch quiz details
@@ -52,7 +58,7 @@ const QuizTaking = () => {
         // Fetch questions and their options
         const { data: questionsData, error: questionsError } = await supabase
           .from('questions')
-          .select('id, text, media_url, points, options, correct_answer, explanation')
+          .select('id, question_text, media_url, points, options, correct_answer, explanation')
           .eq('quiz_id', quizId);
 
         if (questionsError) throw questionsError;
@@ -149,8 +155,8 @@ const QuizTaking = () => {
 
       if (insertAnswersError) throw insertAnswersError;
 
-      // Navigate to quiz results page
-      navigate(`/student/quiz-results/${quizId}`);
+      // Call onFinishQuiz prop instead of navigating
+      onFinishQuiz();
 
     } catch (err: any) {
       setError(err.message);
@@ -243,7 +249,7 @@ const QuizTaking = () => {
         </CardHeader>
         <CardContent>
           <div className="my-4">
-            <p className="text-xl mt-2 font-semibold">{currentQuestion.text}</p>
+            <p className="text-xl mt-2 font-semibold">{currentQuestion.question_text}</p>
             {currentQuestion.media_url && renderMedia(currentQuestion.media_url)}
           </div>
           <RadioGroup

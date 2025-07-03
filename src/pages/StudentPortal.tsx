@@ -24,8 +24,6 @@ export default function StudentPortal() {
   const [sidebarOpen, setSidebarOpen] = useState(false); // State for sidebar
   const { toast } = useToast();
   const isMobile = useIsMobile();
-  const navigate = useNavigate(); // Initialize useNavigate
-
   useEffect(() => {
     if (isMobile) {
       setSidebarOpen(false); // Auto-close sidebar on page change in mobile
@@ -33,7 +31,14 @@ export default function StudentPortal() {
   }, [currentPage, isMobile]);
 
   const handleStartQuiz = (quizId: string) => {
-    navigate(`/student/quiz-taking/${quizId}`); // Navigate to QuizTaking page with quizId
+    setSelectedQuizId(quizId);
+    setTakingQuiz(true);
+  };
+
+  const handleFinishQuiz = () => {
+    setSelectedQuizId(null);
+    setTakingQuiz(false);
+    setCurrentPage('results'); // Navigate to results page after finishing quiz
   };
 
   const handleReviewQuiz = (quizId: string) => {
@@ -76,6 +81,20 @@ export default function StudentPortal() {
         isTakingQuiz={false}
       >
         <QuizReview quizId={reviewingQuizId} onBack={handleBackFromReview} />
+      </StudentLayout>
+    );
+  }
+
+  if (takingQuiz && selectedQuizId) {
+    return (
+      <StudentLayout
+        currentPage={currentPage}
+        onPageChange={setCurrentPage}
+        sidebarOpen={sidebarOpen}
+        setSidebarOpen={setSidebarOpen}
+        isTakingQuiz={true}
+      >
+        <QuizTaking quizId={selectedQuizId} onFinishQuiz={handleFinishQuiz} />
       </StudentLayout>
     );
   }

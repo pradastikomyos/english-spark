@@ -260,6 +260,16 @@ serve(async (req) => {
       const quizId = newQuiz.id;
       console.log(`Successfully created quiz with ID: ${quizId}`);
 
+      // Helper function to get points based on difficulty
+      const getPointsForDifficulty = (difficulty: string): number => {
+        switch (difficulty.toLowerCase()) {
+          case 'easy': return 2;
+          case 'medium': return 3;
+          case 'hard': return 5;
+          default: return 3; // default to medium
+        }
+      };
+
       // Prepare questions for insertion, with validation
       const questionsToInsert = questions
         .map((q: any, index: number) => {
@@ -268,13 +278,14 @@ serve(async (req) => {
             return null;
           }
           const correctAnswer = String(q.correct_answer_key || 'A').toUpperCase();
+          const difficulty = (['easy', 'medium', 'hard'].includes(q.difficulty?.toLowerCase()) ? q.difficulty.toLowerCase() : 'medium');
           return {
             quiz_id: quizId,
             question_text: q.question_text,
             options: q.options,
             correct_answer: correctAnswer,
-            difficulty: (['easy', 'medium', 'hard'].includes(q.difficulty?.toLowerCase()) ? q.difficulty.toLowerCase() : 'medium'),
-            points: q.points || 10,
+            difficulty: difficulty,
+            points: getPointsForDifficulty(difficulty),
             question_order: index + 1,
           };
         })
