@@ -10,6 +10,10 @@
   - **Database Permissions & RLS:** Corrected multiple database issues, including function permissions, subtle data type mismatches (`text` vs. `varchar`), and added `SECURITY DEFINER` to bypass Row-Level Security (RLS) policies, ensuring the leaderboard displays all students, not just the current user.
   - **Frontend Logic:** Updated the `Leaderboard.tsx` component to call the correct new database functions based on the selected view ("My Class" or "School").
 
+- **Quiz Correct Answers Count:**
+  - **Logical Bug:** Fixed a critical bug where the 'Correct Answers' count in the quiz review page consistently showed zero. The root cause was a data mismatch in the `QuizTaking.tsx` component, where it was incorrectly comparing a unique option ID (UUID) with the correct answer key (e.g., 'A', 'B'), causing all answers to be marked as incorrect upon submission.
+  - **Frontend Logic Fix:** Refactored the `QuizTaking.tsx` component to consistently use the key-value model (e.g., 'A', 'B', 'C') for quiz options. This aligns the answer-checking logic with the data structure used in the rest of the application, ensuring that correct answers are now accurately calculated and stored.
+
 - **User Deletion:**
   - **Foreign Key Constraint Error:** Fixed a critical bug where deleting a teacher user would fail due to a foreign key constraint. The `delete_teacher_user` function was updated to correctly remove the user's role before deleting the user record.
 
