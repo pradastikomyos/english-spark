@@ -7,6 +7,7 @@ import { useToast } from './use-toast';
 export interface AuthContextType {
   user: User | null;
   session: Session | null;
+  userId: string | null;
   role: 'admin' | 'teacher' | 'student' | null;
   profileId: string | null;
   loading: boolean;
@@ -87,7 +88,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
-  const value = { session, user, role, profileId, loading, signIn, signOut };
+  const value = { session, user, userId: user?.id || null, role, profileId, loading, signIn, signOut };
 
   return (
     <AuthContext.Provider value={value}>

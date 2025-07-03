@@ -38,7 +38,11 @@ export default function StudentPortal() {
   const handleFinishQuiz = () => {
     setSelectedQuizId(null);
     setTakingQuiz(false);
-    setCurrentPage('results'); // Navigate to results page after finishing quiz
+    setCurrentPage('assigned'); // Navigate to assigned quizzes page after finishing quiz
+    toast({
+      title: "Quiz Submitted!",
+      description: "Your answers have been recorded. Check your results in the assigned quizzes list.",
+    });
   };
 
   const handleReviewQuiz = (quizId: string) => {

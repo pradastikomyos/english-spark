@@ -31,15 +31,15 @@ interface ReviewData {
 }
 
 export function QuizReview({ quizId, onBack }: QuizReviewProps) {
-  const { profileId } = useAuth();
+  const { userId } = useAuth();
   const [reviewData, setReviewData] = useState<ReviewData | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (profileId && quizId) {
+    if (userId && quizId) {
       fetchReviewData();
     }
-  }, [profileId, quizId]);
+  }, [userId, quizId]);
 
   const fetchReviewData = async () => {
     try {
@@ -48,11 +48,22 @@ export function QuizReview({ quizId, onBack }: QuizReviewProps) {
       const { data: progressData, error: progressError } = await supabase
         .from('user_progress')
         .select('*, quizzes(title)')
-        .eq('student_id', profileId)
+        .eq('user_id', userId)
         .eq('quiz_id', quizId)
         .order('completed_at', { ascending: false })
         .limit(1)
         .single();
+
+      if (progressError) {
+        // It's possible there's no progress yet, so don't throw, just return.
+        if (progressError.code === 'PGRST116') {
+          console.log('No progress found for this quiz yet.');
+          setReviewData(null);
+        } else {
+          throw progressError;
+        }
+        return; 
+      }
 
       if (progressError) throw progressError;
 

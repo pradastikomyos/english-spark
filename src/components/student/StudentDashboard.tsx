@@ -49,7 +49,7 @@ interface StudentDashboardProps {
 }
 
 export function StudentDashboard({ onStartQuiz, onReviewQuiz }: StudentDashboardProps) {
-  const { profileId } = useAuth();
+  const { user, profileId } = useAuth();
   const { toast } = useToast();
   const [stats, setStats] = useState<DashboardStats>({
     studentData: null,
@@ -129,7 +129,7 @@ export function StudentDashboard({ onStartQuiz, onReviewQuiz }: StudentDashboard
       const { data: completedQuizzes } = await supabase
         .from('user_progress')
         .select('quiz_id')
-        .eq('student_id', profileId)
+        .eq('user_id', user?.id)
         .in('quiz_id', assignedQuizIds);
 
       const completedQuizIds = completedQuizzes?.map(c => c.quiz_id) || [];
