@@ -1,3 +1,5 @@
+console.log('App.tsx loaded');
+
 import { useEffect, useState } from 'react';
 import { useAuth, AuthProvider } from '@/hooks/useAuth';
 import { AuthForm } from '@/components/auth/AuthForm';
@@ -15,21 +17,21 @@ import { BrowserRouter, Routes, Route, Navigate, useNavigate } from 'react-route
 const queryClient = new QueryClient();
 
 function AppContent() {
-  const { user, userRole, loading } = useAuth();
+  const { user, role, loading } = useAuth();
   const [loadingTimeout, setLoadingTimeout] = useState(false);
   const navigate = useNavigate();
 
   useEffect(() => {
-    if (userRole) {
-      if (userRole === 'admin') {
+    if (role) {
+      if (role === 'admin') {
         navigate('/admin');
-      } else if (userRole === 'teacher') {
+      } else if (role === 'teacher') {
         navigate('/teacher');
-      } else if (userRole === 'student') {
+      } else if (role === 'student') {
         navigate('/student');
       }
     }
-  }, [userRole, navigate]);
+  }, [role, navigate]);
 
   useEffect(() => {
     if (loading) {
@@ -77,10 +79,10 @@ function AppContent() {
 
   return (
     <Routes>
-      <Route path="/admin/*" element={userRole === 'admin' ? <AdminPortal /> : <Navigate to="/" />} />
-      <Route path="/teacher/*" element={userRole === 'teacher' ? <TeacherPortal /> : <Navigate to="/" />} />
-      <Route path="/student/*" element={userRole === 'student' ? <StudentPortal /> : <Navigate to="/" />} />
-      <Route path="/student/quiz-taking/:quizId" element={userRole === 'student' ? <QuizTaking /> : <Navigate to="/" />} />
+      <Route path="/admin/*" element={role === 'admin' ? <AdminPortal /> : <Navigate to="/" />} />
+      <Route path="/teacher/*" element={role === 'teacher' ? <TeacherPortal /> : <Navigate to="/" />} />
+      <Route path="/student/*" element={role === 'student' ? <StudentPortal /> : <Navigate to="/" />} />
+      <Route path="/student/quiz-taking/:quizId" element={role === 'student' ? <QuizTaking /> : <Navigate to="/" />} />
       <Route path="/" element={<AuthForm />} /> {/* Default route for login */}
       <Route path="*" element={<Navigate to="/" />} /> {/* Catch-all for unknown routes */}
     </Routes>
@@ -93,9 +95,7 @@ const App = () => (
       <AuthProvider>
         <Toaster />
         <Sonner />
-        <BrowserRouter> {/* Wrap AppContent with BrowserRouter */}
-          <AppContent />
-        </BrowserRouter>
+        <AppContent />
       </AuthProvider>
     </TooltipProvider>
   </QueryClientProvider>

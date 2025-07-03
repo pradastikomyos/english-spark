@@ -8,17 +8,14 @@ import { Label } from '@/components/ui/label';
 import { Progress } from '@/components/ui/progress';
 
 // Define types for our data
-interface Option {
-  id: string;
-  text: string;
-}
-
 interface Question {
   id: string;
   text: string;
   media_url: string | null;
-  options: Option[];
+  options: Record<string, string>;
   points: number;
+  correct_answer: string;
+  explanation: string | null;
 }
 
 interface Quiz {
@@ -55,7 +52,7 @@ const QuizTaking = () => {
         // Fetch questions and their options
         const { data: questionsData, error: questionsError } = await supabase
           .from('questions')
-          .select('id, text, media_url, points, options(id, text)')
+          .select('id, text, media_url, points, options, correct_answer, explanation')
           .eq('quiz_id', quizId);
 
         if (questionsError) throw questionsError;
@@ -87,10 +84,80 @@ const QuizTaking = () => {
   };
 
   const handleSubmit = async () => {
-    // Logic to calculate score and submit results
-    // This is a placeholder for your submission logic
-    alert('Quiz submitted! (Submission logic to be implemented)');
-    navigate('/dashboard'); // Navigate away after submission
+    setIsLoading(true);
+    setError(null);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        throw new Error('User not authenticated.');
+      }
+
+      let correctAnswersCount = 0;
+      let totalScore = 0;
+      const userAnswersToInsert = [];
+
+      for (const question of questions) {
+        const selectedOptionId = selectedAnswers[question.id];
+        const isCorrect = selectedOptionId === question.correct_answer;
+
+        if (isCorrect) {
+          correctAnswersCount++;
+          totalScore += question.points;
+        }
+
+        userAnswersToInsert.push({
+          user_id: user.id,
+          question_id: question.id,
+          selected_option: selectedOptionId,
+          is_correct: isCorrect,
+        });
+      }
+
+      // Calculate score percentage
+      const scorePercentage = questions.length > 0 ? (correctAnswersCount / questions.length) * 100 : 0;
+
+      // Get current time for time_taken (assuming you start a timer when quiz begins)
+      // For now, let's use a placeholder or calculate based on a start time if available
+      const timeTaken = 0; // TODO: Implement actual time tracking
+
+      // Insert user progress
+      const { data: progressData, error: progressError } = await supabase
+        .from('user_progress')
+        .insert({
+          user_id: user.id,
+          quiz_id: quizId,
+          score: scorePercentage,
+          total_questions: questions.length,
+          correct_answers: correctAnswersCount,
+          time_taken: timeTaken, // Placeholder
+          completed_at: new Date().toISOString(),
+        })
+        .select('id')
+        .single();
+
+      if (progressError) throw progressError;
+
+      // Link user answers to the progress entry
+      const answersWithProgressId = userAnswersToInsert.map(answer => ({
+        ...answer,
+        user_progress_id: progressData.id,
+      }));
+
+      const { error: insertAnswersError } = await supabase
+        .from('user_answers')
+        .insert(answersWithProgressId);
+
+      if (insertAnswersError) throw insertAnswersError;
+
+      // Navigate to quiz results page
+      navigate(`/student/quiz-results/${quizId}`);
+
+    } catch (err: any) {
+      setError(err.message);
+      console.error('Submission error:', err);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   if (isLoading) return <div className="p-4">Loading quiz...</div>;
@@ -143,7 +210,7 @@ const QuizTaking = () => {
     return null;
   };
 
-  return (
+    return (
     <div className="container mx-auto p-4 max-w-2xl">
       {zoomedImageUrl && (
         <div
@@ -164,42 +231,52 @@ const QuizTaking = () => {
           </button>
         </div>
       )}
-      <Card>
-            <CardHeader>
-                <CardTitle>{quiz.title}</CardTitle>
-                <CardDescription>{quiz.description}</CardDescription>
-                <Progress value={progress} className="mt-2" />
-            </CardHeader>
-            <CardContent>
-                <div className="my-4">
-                    <h2 className="text-lg font-semibold">Question {currentQuestionIndex + 1} of {questions.length}</h2>
-                    <p className="text-xl mt-2">{currentQuestion.text}</p>
-                    
-                    {/* Render media if it exists */}
-                    {currentQuestion.media_url && renderMedia(currentQuestion.media_url)}
 
-                </div>
-                <RadioGroup
-                    value={selectedAnswers[currentQuestion.id] || ''}
-                    onValueChange={(value) => handleAnswerChange(currentQuestion.id, value)}
-                >
-                    {currentQuestion.options.map(option => (
-                        <div key={option.id} className="flex items-center space-x-2 my-2 p-2 border rounded-md">
-                            <RadioGroupItem value={option.id} id={option.id} />
-                            <Label htmlFor={option.id} className="flex-1">{option.text}</Label>
-                        </div>
-                    ))}
-                </RadioGroup>
-            </CardContent>
-        </Card>
-        <div className="flex justify-between mt-4">
-            <Button onClick={handlePrev} disabled={currentQuestionIndex === 0}>Previous</Button>
-            {currentQuestionIndex === questions.length - 1 ? (
-                <Button onClick={handleSubmit}>Submit Quiz</Button>
-            ) : (
-                <Button onClick={handleNext}>Next</Button>
-            )}
-        </div>
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-2xl font-bold">{quiz.title}</CardTitle>
+          <CardDescription>{quiz.description}</CardDescription>
+          <div className="mt-4">
+            <Progress value={progress} />
+            <p className="text-sm text-center mt-1">Question {currentQuestionIndex + 1} of {questions.length}</p>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <div className="my-4">
+            <p className="text-xl mt-2 font-semibold">{currentQuestion.text}</p>
+            {currentQuestion.media_url && renderMedia(currentQuestion.media_url)}
+          </div>
+          <RadioGroup
+            value={selectedAnswers[currentQuestion.id] || ''}
+            onValueChange={(value) => handleAnswerChange(currentQuestion.id, value)}
+            className="mt-4 space-y-3"
+          >
+            {Object.entries(currentQuestion.options).map(([key, value]) => (
+              <div key={key} className="flex items-center p-3 border rounded-lg has-[:checked]:bg-blue-50 has-[:checked]:border-blue-500 transition-colors">
+                <RadioGroupItem value={key} id={`${currentQuestion.id}-${key}`} />
+                <Label htmlFor={`${currentQuestion.id}-${key}`} className="ml-3 text-base flex-1 cursor-pointer">
+                  <span className="font-bold mr-2">{key}.</span> {value}
+                </Label>
+              </div>
+            ))}
+          </RadioGroup>
+        </CardContent>
+      </Card>
+
+      <div className="flex justify-between mt-6">
+        <Button onClick={handlePrev} disabled={currentQuestionIndex === 0}>
+          Previous
+        </Button>
+        {currentQuestionIndex === questions.length - 1 ? (
+          <Button onClick={handleSubmit} disabled={!selectedAnswers[currentQuestion.id] || isLoading}>
+            {isLoading ? 'Submitting...' : 'Submit Quiz'}
+          </Button>
+        ) : (
+          <Button onClick={handleNext} disabled={!selectedAnswers[currentQuestion.id]}>
+            Next
+          </Button>
+        )}
+      </div>
     </div>
   );
 };

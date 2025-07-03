@@ -15,7 +15,8 @@ import {
   Target,
   Users,
   BarChart3,
-  List
+  List,
+  TrendingUp
 } from 'lucide-react';
 import {
   Table,
@@ -52,7 +53,7 @@ interface LeaderboardStats {
 }
 
 export function Leaderboard() {
-  const { profileId, userRole } = useAuth();
+  const { profileId, role: userRole, loading: authLoading } = useAuth();
   const { toast } = useToast();
   const [leaderboardData, setLeaderboardData] = useState<LeaderboardStudent[]>([]);
   const [teacherViewData, setTeacherViewData] = useState<TeacherStudentView[]>([]);
@@ -66,11 +67,17 @@ export function Leaderboard() {
   const [view, setView] = useState<'class' | 'school'>('school');
 
   useEffect(() => {
-    if (profileId && userRole) {
+    // If auth is finished and we have a profile, fetch the leaderboard data.
+    if (!authLoading && profileId && userRole) {
       fetchData();
+    } 
+    // If auth is finished but there's no profile (e.g., not logged in, or error), 
+    // we should stop the loading spinner. The component will then render a message.
+    else if (!authLoading) {
+      setLoading(false);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [profileId, userRole, view]);
+  }, [authLoading, profileId, userRole, view]);
 
   const fetchData = async () => {
     setLoading(true);
@@ -90,26 +97,36 @@ export function Leaderboard() {
         setTeacherViewData(formattedData);
 
       } else if (userRole === 'student') {
-        const { data: currentUser, error: userError } = await supabase
-          .from('students')
-          .select('class_id')
-          .eq('id', profileId)
-          .single();
+        let studentsData, studentsError;
 
-        if (userError) throw userError;
+        if (view === 'class') {
+          // First, get the current student's class_id
+          const { data: currentUser, error: userError } = await supabase
+            .from('students')
+            .select('class_id')
+            .eq('id', profileId)
+            .single();
 
-        let query = supabase
-          .from('students')
-          .select('id, name, total_points, level, current_streak, classes(name)')
-          .order('total_points', { ascending: false })
-          .order('level', { ascending: false })
-          .order('current_streak', { ascending: false });
-        
-        if (view === 'class' && currentUser?.class_id) {
-          query = query.eq('class_id', currentUser.class_id);
+          if (userError) throw userError;
+          if (!currentUser?.class_id) {
+            toast({
+              title: 'Not in a class',
+              description: 'You need to be in a class to see class rankings.',
+              variant: 'default',
+            });
+            setLeaderboardData([]);
+            setLoading(false);
+            return;
+          }
+
+          // Then, fetch the leaderboard for that specific class
+          ({ data: studentsData, error: studentsError } = await supabase.rpc('get_class_leaderboard', { p_class_id: currentUser.class_id }));
+
+        } else { // 'school' view
+          // Fetch the leaderboard for the entire school
+          ({ data: studentsData, error: studentsError } = await supabase.rpc('get_school_leaderboard'));
         }
 
-        const { data: studentsData, error: studentsError } = await query;
         if (studentsError) throw studentsError;
 
         const rankedStudents: LeaderboardStudent[] = (studentsData || []).map((student: any, index) => ({
@@ -170,7 +187,9 @@ export function Leaderboard() {
     return Math.min(100, (progressInCurrentLevel / pointsNeededForNextLevel) * 100);
   };
 
-  if (loading) {
+  const isLoading = authLoading || loading;
+
+  if (isLoading) {
     return (
       <div className="space-y-6">
         <div className="text-center">
@@ -418,7 +437,7 @@ export function Leaderboard() {
                     You're #{stats.currentUserRank} out of {stats.totalStudents} students. 
                     {stats.currentUserRank <= 3 
                       ? " You're in the top 3! Amazing work!" 
-                      : ` Just ${(students[stats.currentUserRank - 2] as LeaderboardStudent)?.total_points - (students.find(s => (s as LeaderboardStudent).isCurrentUser) as LeaderboardStudent)?.total_points || 0} more points to move up!`
+                      : ` Just ${(leaderboardData[stats.currentUserRank - 2] as LeaderboardStudent)?.total_points - (leaderboardData.find(s => (s as LeaderboardStudent).isCurrentUser) as LeaderboardStudent)?.total_points || 0} more points to move up!`
                     }
                   </p>
                 </div>

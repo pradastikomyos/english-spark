@@ -39,20 +39,32 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { MoreHorizontal, PlusCircle } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 // Zod schema for form validation
 const studentSchema = z.object({
   name: z.string().min(2, { message: 'Name must be at least 2 characters.' }),
   email: z.string().email({ message: 'Please enter a valid email.' }),
   student_id: z.string().min(3, { message: 'Student ID must be at least 3 characters.' }),
+  class_id: z.string().uuid({ message: 'You must select a class.' }),
 });
 
 type StudentFormData = z.infer<typeof studentSchema>;
 
 // Define the type for a student based on your database schema
 interface Student {
+  student_profile_id: string; // Renamed from id to match RPC response
+  user_auth_id: string | null; // Can be null for students without auth users
+  name: string;
+  email: string;
+  student_id: string;
+  created_at: string;
+}
+
+// Legacy interface for backward compatibility
+interface StudentLegacy {
   id: string;
-  user_id: string; // Important for delete operation
+  user_id: string | null;
   name: string;
   email: string;
   student_id: string;
@@ -62,19 +74,12 @@ interface Student {
 // Fetch function to get all students
 const fetchStudents = async (): Promise<Student[]> => {
   try {
-    // First try to use RPC call for admin access
-    const { data: rpcData, error: rpcError } = await supabase.rpc('get_all_students_admin');
-    
-    if (!rpcError && rpcData) {
-      return rpcData;
-    }
-    
-    // Fallback to direct table query
+    // Bypassing the faulty RPC and using a direct query instead.
     const { data, error } = await supabase
       .from('students')
-      .select('id, user_id, name, email, student_id, created_at')
+      .select('student_profile_id:id, user_auth_id:user_id, name, email, student_id, created_at')
       .order('created_at', { ascending: false });
-    
+
     if (error) {
       // If it's an RLS policy error, provide a more helpful message
       if (error.message.includes('policy') || error.message.includes('recursion')) {
@@ -82,8 +87,8 @@ const fetchStudents = async (): Promise<Student[]> => {
       }
       throw new Error(error.message);
     }
-    
-    return data || [];
+
+    return data as unknown as Student[] || [];
   } catch (err: any) {
     throw new Error(err.message || 'Failed to fetch students');
   }
@@ -91,13 +96,19 @@ const fetchStudents = async (): Promise<Student[]> => {
 
 // Function to call the create RPC
 const createStudent = async (studentData: StudentFormData) => {
-  const { data, error } = await supabase.rpc('create_student_user', {
-    p_name: studentData.name,
-    p_email: studentData.email,
-    p_student_id: studentData.student_id,
+  const { data, error } = await supabase.functions.invoke('create-student', {
+    body: {
+      name: studentData.name,
+      email: studentData.email,
+      student_id: studentData.student_id,
+      class_id: studentData.class_id,
+    },
   });
+
   if (error) throw new Error(error.message);
-  return data[0];
+  if (data.error) throw new Error(data.error);
+
+  return data;
 };
 
 // Function to call the update RPC
@@ -111,17 +122,44 @@ const updateStudent = async (studentData: StudentFormData & { id: string }) => {
   if (error) throw new Error(error.message);
 };
 
+// Function to call the reset password function
+const resetStudentPassword = async (email: string) => {
+  const { data, error } = await supabase.functions.invoke('reset-student-password', {
+    body: { email },
+  });
+
+  if (error) throw new Error(error.message);
+  if (data.error) throw new Error(data.error.message);
+
+  return data;
+};
+
 export function StudentManagement() {
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [studentToEdit, setStudentToEdit] = useState<Student | null>(null);
   const [studentToDelete, setStudentToDelete] = useState<Student | null>(null);
+  const [tempPasswords, setTempPasswords] = useState<Record<string, string>>({});
+  const [classes, setClasses] = useState<{ id: string; name: string }[]>([]);
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
   const form = useForm<StudentFormData>({
     resolver: zodResolver(studentSchema),
-    defaultValues: { name: '', email: '', student_id: '' },
+    defaultValues: { name: '', email: '', student_id: '', class_id: '' },
   });
+
+  // Fetch classes when the component mounts
+  useEffect(() => {
+    const fetchClasses = async () => {
+      const { data, error } = await supabase.from('classes').select('id, name');
+      if (error) {
+        toast({ title: 'Error fetching classes', description: error.message, variant: 'destructive' });
+      } else {
+        setClasses(data);
+      }
+    };
+    fetchClasses();
+  }, [toast]);
 
   // Effect to reset form when edit dialog opens
   useEffect(() => {
@@ -132,7 +170,7 @@ export function StudentManagement() {
         student_id: studentToEdit.student_id,
       });
     } else {
-      form.reset({ name: '', email: '', student_id: '' });
+      form.reset({ name: '', email: '', student_id: '', class_id: '' });
     }
   }, [studentToEdit, form]);
 
@@ -146,8 +184,10 @@ export function StudentManagement() {
     onSuccess: (data) => {
       toast({
         title: 'Student Created!',
-        description: `Account for ${data.name} created. Password: ${data.temporary_password}`,
+        description: `Student ${data.student.name} has been created. Password is shown in the table.`,
       });
+      // Store the temporary password in the local state
+      setTempPasswords(prev => ({ ...prev, [data.student.email]: data.temporaryPassword }));
       queryClient.invalidateQueries({ queryKey: ['students'] });
       setIsAddDialogOpen(false);
     },
@@ -169,24 +209,45 @@ export function StudentManagement() {
   });
 
   const deleteMutation = useMutation({
-    mutationFn: async (userId: string) => {
-      const { error } = await supabase.rpc('delete_student_user', { p_user_id: userId });
+    mutationFn: async (studentProfileId: string) => {
+      const { error } = await supabase.rpc('admin_delete_student', { p_student_profile_id: studentProfileId });
       if (error) throw error;
+      return studentProfileId; // Return the id of the deleted student
     },
-    onSuccess: () => {
+    onSuccess: (deletedStudentId) => {
       toast({ title: 'Success', description: 'Student has been deleted.' });
-      queryClient.invalidateQueries({ queryKey: ['students'] });
+      // Manually update the cache for an instant UI response
+      queryClient.setQueryData(['students'], (oldData: Student[] | undefined) => {
+        return oldData ? oldData.filter(student => student.student_profile_id !== deletedStudentId) : [];
+      });
       setStudentToDelete(null);
     },
     onError: (error) => {
-      toast({ title: 'Error', description: error.message, variant: 'destructive' });
+      toast({ title: 'Error', description: `Failed to delete student: ${error.message}`, variant: 'destructive' });
       setStudentToDelete(null);
+    },
+  });
+
+  const resetPasswordMutation = useMutation({
+    mutationFn: resetStudentPassword,
+    onSuccess: (data) => {
+      toast({
+        title: 'Password Reset Initiated',
+        description: data.message,
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: 'Error',
+        description: `Failed to initiate password reset: ${error.message}`,
+        variant: 'destructive',
+      });
     },
   });
 
   const onFormSubmit = (values: StudentFormData) => {
     if (studentToEdit) {
-      updateMutation.mutate({ ...values, id: studentToEdit.id });
+      updateMutation.mutate({ ...values, id: studentToEdit.student_profile_id });
     } else {
       createMutation.mutate(values);
     }
@@ -196,7 +257,7 @@ export function StudentManagement() {
   if (error) return <div>Error fetching students: {error.message}</div>;
 
   return (
-    <AlertDialog>
+    <>
       <div className="flex justify-between items-center mb-4">
         <h2 className="text-xl font-semibold">Student Management</h2>
         <Dialog open={isAddDialogOpen || !!studentToEdit} onOpenChange={(isOpen) => {
@@ -256,9 +317,33 @@ export function StudentManagement() {
                     </FormItem>
                   )}
                 />
-                <DialogFooter className="pt-4">
+                <FormField
+                  control={form.control}
+                  name="class_id"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Class</FormLabel>
+                      <Select onValueChange={field.onChange} defaultValue={field.value}>
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select a class" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {classes.map((c) => (
+                            <SelectItem key={c.id} value={c.id}>
+                              {c.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <DialogFooter>
                   <Button type="submit" disabled={createMutation.isPending || updateMutation.isPending}>
-                    {createMutation.isPending || updateMutation.isPending ? 'Saving...' : (studentToEdit ? 'Save Changes' : 'Create Student')}
+                    {studentToEdit ? 'Save Changes' : 'Create Student'}
                   </Button>
                 </DialogFooter>
               </form>
@@ -266,77 +351,84 @@ export function StudentManagement() {
           </DialogContent>
         </Dialog>
       </div>
-
       <Card>
-        <CardContent className="p-0">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Name</TableHead>
-                <TableHead>Email</TableHead>
-                <TableHead>Student ID</TableHead>
-                <TableHead>Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {students?.map((student) => (
-                <TableRow key={student.id}>
-                  <TableCell>{student.name}</TableCell>
-                  <TableCell>{student.email}</TableCell>
-                  <TableCell>{student.student_id}</TableCell>
-                  <TableCell>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" className="h-8 w-8 p-0">
-                          <span className="sr-only">Open menu</span>
-                          <MoreHorizontal className="h-4 w-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem onSelect={() => setStudentToEdit(student)}>
-                          Edit
-                        </DropdownMenuItem>
-                        <AlertDialogTrigger asChild>
-                          <DropdownMenuItem
-                            className="text-red-600"
-                            onSelect={(e) => {
-                              e.preventDefault();
-                              setStudentToDelete(student);
-                            }}
-                          >
-                            Delete
-                          </DropdownMenuItem>
-                        </AlertDialogTrigger>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </TableCell>
+        <CardContent className="p-6">
+          {students && students.length > 0 ? (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Name</TableHead>
+                  <TableHead>Email</TableHead>
+                  <TableHead>Student ID</TableHead>
+                  <TableHead>Password</TableHead>
+                  <TableHead>Created At</TableHead>
+                  <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+              </TableHeader>
+              <TableBody>
+                {students.map((student) => (
+                  <TableRow key={student.student_profile_id}>
+                    <TableCell className="font-medium">{student.name}</TableCell>
+                    <TableCell>{student.email}</TableCell>
+                    <TableCell>{student.student_id}</TableCell>
+                    <TableCell className="font-mono">{tempPasswords[student.email] || '********'}</TableCell>
+                    <TableCell>{new Date(student.created_at).toLocaleDateString()}</TableCell>
+                    <TableCell className="text-right">
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" className="h-8 w-8 p-0">
+                            <span className="sr-only">Open menu</span>
+                            <MoreHorizontal className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem onClick={() => setStudentToEdit(student)}>Edit</DropdownMenuItem>
+                          <DropdownMenuItem
+                            onClick={() => resetPasswordMutation.mutate(student.email)}
+                            disabled={resetPasswordMutation.isPending}
+                          >
+                            {resetPasswordMutation.isPending ? 'Sending...' : 'Reset Password'}
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => setStudentToDelete(student)} className="text-red-600">Delete</DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          ) : (
+            <p className="text-center text-gray-500">No students found. Click "Add New Student" to get started.</p>
+          )}
         </CardContent>
       </Card>
-      
-      {studentToDelete && (
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={!!studentToDelete} onOpenChange={(isOpen) => {
+        if (!isOpen) {
+          setStudentToDelete(null);
+        }
+      }}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
             <AlertDialogDescription>
-              This action cannot be undone. This will permanently delete the account for <strong>{studentToDelete.name}</strong> and all associated data.
+              This action cannot be undone. This will permanently delete {studentToDelete?.name}'s account
+              and remove their data from our servers.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel onClick={() => setStudentToDelete(null)}>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={() => deleteMutation.mutate(studentToDelete.user_id)}
-              disabled={deleteMutation.isPending}
-              className="bg-red-600 hover:bg-red-700"
-            >
-              {deleteMutation.isPending ? 'Deleting...' : 'Yes, delete student'}
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={() => {
+              if (studentToDelete) {
+                deleteMutation.mutate(studentToDelete.student_profile_id);
+              }
+            }} disabled={deleteMutation.isPending}>
+              {deleteMutation.isPending ? 'Deleting...' : 'Delete'}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
-      )}
-    </AlertDialog>
+      </AlertDialog>
+    </>
   );
 }

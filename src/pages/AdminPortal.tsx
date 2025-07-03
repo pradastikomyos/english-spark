@@ -3,7 +3,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import TeacherManagement from '@/components/admin/TeacherManagement';
 import AdminQuizManagement from '@/components/admin/QuizManagement';
 import { StudentManagement } from '@/components/admin/StudentManagement';
-
+import ClassManagement from '@/components/admin/ClassManagement';
 import AdminMaterialManagement from '@/components/admin/MaterialManagement';
 import AdminLayout from '@/components/admin/AdminLayout';
 
@@ -11,9 +11,10 @@ const AdminPortal: React.FC = () => {
   return (
     <AdminLayout>
       <Tabs defaultValue="teachers" className="w-full">
-        <TabsList className="grid w-full grid-cols-4">
+        <TabsList className="grid w-full grid-cols-5">
           <TabsTrigger value="teachers">Manage Teachers</TabsTrigger>
           <TabsTrigger value="students">Manage Students</TabsTrigger>
+          <TabsTrigger value="classes">Manage Classes</TabsTrigger>
           <TabsTrigger value="quizzes">Manage Quizzes</TabsTrigger>
           <TabsTrigger value="materials">Manage Materials</TabsTrigger>
         </TabsList>
@@ -27,6 +28,12 @@ const AdminPortal: React.FC = () => {
         <TabsContent value="students" className="mt-6">
           <div className="bg-white p-6 rounded-lg shadow">
             <StudentManagement />
+          </div>
+        </TabsContent>
+
+        <TabsContent value="classes" className="mt-6">
+          <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow">
+            <ClassManagement />
           </div>
         </TabsContent>
         

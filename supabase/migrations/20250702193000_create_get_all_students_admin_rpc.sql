@@ -1,6 +1,8 @@
+DROP FUNCTION IF EXISTS get_all_students_admin();
+
 create or replace function get_all_students_admin()
 returns table (
-    id uuid,
+    profile_id uuid, -- Renamed 'id' to 'profile_id'
     user_id uuid,
     name text,
     email text,
@@ -16,7 +18,13 @@ begin
     end if;
 
     return query
-    select s.id, u.id as user_id, s.name, u.email, s.student_id, s.created_at
+    select
+        s.id as profile_id,
+        u.id as user_id,
+        s.name,
+        s.email,
+        s.student_id,
+        s.created_at
     from students s
     join auth.users u on s.user_id = u.id
     order by s.created_at desc;
