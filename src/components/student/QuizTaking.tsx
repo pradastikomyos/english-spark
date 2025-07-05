@@ -47,7 +47,9 @@ const QuizTaking = ({ quizId, onFinishQuiz }: QuizTakingProps) => {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [timeRemaining, setTimeRemaining] = useState<number | null>(null);
+  const [timeLimit, setTimeLimit] = useState<number | null>(null);
   const [startTime, setStartTime] = useState<Date | null>(null);
+  const [endTime, setEndTime] = useState<Date | null>(null);
   const [quizResult, setQuizResult] = useState<{ final_score: number; base_score: number; bonus_points: number; results_breakdown: ResultBreakdownItem[] } | null>(null);
 
   useEffect(() => {
@@ -70,6 +72,7 @@ const QuizTaking = ({ quizId, onFinishQuiz }: QuizTakingProps) => {
         setQuiz({ title: quizDetails.quiz_title, description: quizDetails.quiz_description });
         setQuestions(quizDetails.questions || []);
         setTimeRemaining(quizDetails.time_limit_seconds || null);
+        setTimeLimit(quizDetails.time_limit_seconds || null);
         setStartTime(new Date());
 
       } catch (err: any) {
@@ -83,7 +86,7 @@ const QuizTaking = ({ quizId, onFinishQuiz }: QuizTakingProps) => {
   }, [quizId]);
 
   useEffect(() => {
-    if (timeRemaining === null) return;
+    if (timeRemaining === null || quizResult) return; // Stop timer if quiz is finished
 
     if (timeRemaining <= 0) {
       if (!isLoading) {
@@ -97,7 +100,7 @@ const QuizTaking = ({ quizId, onFinishQuiz }: QuizTakingProps) => {
     }, 1000);
 
     return () => clearInterval(timerId);
-  }, [timeRemaining, isLoading]);
+  }, [timeRemaining, isLoading, quizResult]); // Add quizResult dependency
 
   const handleAnswerChange = (questionId: string, optionId: string) => {
     setSelectedAnswers(prev => ({ ...prev, [questionId]: optionId }));
@@ -116,12 +119,16 @@ const QuizTaking = ({ quizId, onFinishQuiz }: QuizTakingProps) => {
   };
 
   const handleSubmit = async () => {
-    if (isLoading) return; // Prevent multiple submissions
+    if (isLoading || quizResult) return; // Prevent multiple submissions
     setIsLoading(true);
     setError(null);
+    
+    // Stop the timer by setting endTime
+    const submitEndTime = new Date();
+    setEndTime(submitEndTime);
+    
     try {
-      const endTime = new Date();
-      const timeTaken = startTime ? Math.round((endTime.getTime() - startTime.getTime()) / 1000) : 0;
+      const timeTaken = startTime ? Math.round((submitEndTime.getTime() - startTime.getTime()) / 1000) : 0;
 
       const { data, error } = await supabase.rpc('submit_quiz_attempt', {
         p_quiz_id: quizId,
@@ -146,16 +153,17 @@ const QuizTaking = ({ quizId, onFinishQuiz }: QuizTakingProps) => {
   };
 
     if (quizResult) {
-    // Calculate detailed score breakdown using gamification logic
+    // Use actual time taken from when quiz was submitted, not current time
+    const actualTimeTaken = endTime && startTime ? Math.round((endTime.getTime() - startTime.getTime()) / 1000) : 0;
+    
+    // Calculate detailed score breakdown using gamification logic with actual time
     const answers = quizResult.results_breakdown.map(item => ({
       difficulty: item.difficulty,
       isCorrect: item.is_correct
     }));
     
-    const endTime = new Date();
-    const timeTaken = startTime ? Math.round((endTime.getTime() - startTime.getTime()) / 1000) : 0;
-    const scoreDetails = calculateQuizScore(answers, timeTaken, 300); // Assuming 5 min time limit
-    const timeBonusTier = getTimeBonusTier(timeTaken, 300);
+    const scoreDetails = calculateQuizScore(answers, actualTimeTaken, timeLimit || 300); // Use actual time limit from database
+    const timeBonusTier = getTimeBonusTier(actualTimeTaken, timeLimit || 300);
 
     return (
       <Card className="m-4 max-w-4xl mx-auto">
@@ -169,11 +177,16 @@ const QuizTaking = ({ quizId, onFinishQuiz }: QuizTakingProps) => {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-8">
-          {/* Total Points Display */}
+          {/* Total Points Display - Use database score as primary, frontend calculation as reference */}
           <div className="text-center p-6 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg border">
             <h2 className="text-2xl font-bold text-gray-700 mb-2">Total Poin</h2>
-            <p className="text-6xl font-extrabold text-blue-600">{scoreDetails.totalPoints}</p>
+            <p className="text-6xl font-extrabold text-blue-600">{quizResult.final_score.toFixed(0)}</p>
             <p className="text-sm text-gray-500 mt-2">Poin yang Anda peroleh</p>
+            {Math.abs(quizResult.final_score - scoreDetails.totalPoints) > 0.5 && (
+              <p className="text-xs text-yellow-600 mt-1">
+                (Perhitungan frontend: {scoreDetails.totalPoints} - ada perbedaan dengan database)
+              </p>
+            )}
           </div>
 
           {/* Score Breakdown by Difficulty */}
@@ -210,7 +223,7 @@ const QuizTaking = ({ quizId, onFinishQuiz }: QuizTakingProps) => {
                   <p className="font-semibold text-purple-800">
                     {timeBonusTier?.label} ({timeBonusTier?.percentage}% waktu tersisa)
                   </p>
-                  <p className="text-sm text-purple-600">Waktu penyelesaian: {Math.floor(timeTaken / 60)}:{(timeTaken % 60).toString().padStart(2, '0')}</p>
+                  <p className="text-sm text-purple-600">Waktu penyelesaian: {Math.floor(actualTimeTaken / 60)}:{(actualTimeTaken % 60).toString().padStart(2, '0')}</p>
                 </div>
                 <span className="font-bold text-purple-700 text-2xl">+{scoreDetails.timeBonus} Poin</span>
               </div>
@@ -345,9 +358,9 @@ const QuizTaking = ({ quizId, onFinishQuiz }: QuizTakingProps) => {
                 </div>
                 <div className="text-xs text-gray-500">
                   {(() => {
-                    const timeLimit = 300; // 5 minutes default
+                    const quizTimeLimit = timeLimit || 300; // Use actual time limit
                     const elapsed = startTime ? Math.round((Date.now() - startTime.getTime()) / 1000) : 0;
-                    const percentageUsed = (elapsed / timeLimit) * 100;
+                    const percentageUsed = (elapsed / quizTimeLimit) * 100;
                     
                     if (percentageUsed <= 25) return "🚀 Lightning Fast (+30 bonus)";
                     if (percentageUsed <= 50) return "⚡ Quick Thinker (+20 bonus)";
