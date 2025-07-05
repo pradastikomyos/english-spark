@@ -44,19 +44,15 @@ export function MaterialViewer({ materialId, onBack }: MaterialViewerProps) {
         }
 
         const { data, error } = await supabase
-          .rpc('get_study_materials_with_status');
+          .rpc('get_study_material_details', { p_material_id: materialId })
+          .single(); // Use .single() as we expect one row
 
         if (error) throw error;
+
         if (data) {
-          const foundMaterial = (data as MaterialDetails[]).find(m => m.id === materialId);
-          if (foundMaterial) {
-            setMaterial(foundMaterial);
-            console.log('Material loaded in viewer:', foundMaterial); // Add this line
-          } else {
-            setError('Material not found.');
-          }
+          setMaterial(data as MaterialDetails);
         } else {
-          setError('No materials found.');
+          setError('Material not found.');
         }
       } catch (err: any) {
         setError(err.message);
@@ -80,6 +76,9 @@ export function MaterialViewer({ materialId, onBack }: MaterialViewerProps) {
         user_id: user.id,
         material_id: materialId,
         is_completed: true,
+        status: 'completed',
+      }, {
+        onConflict: 'user_id,material_id',
       });
 
       if (error) throw error;
