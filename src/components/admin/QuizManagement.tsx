@@ -208,16 +208,27 @@ export default function AdminQuizManagement() {
 
   const handleDeleteQuiz = async () => {
     if (!quizToDelete) return;
+    
+    const quizTitle = quizToDelete.title; // Store title before deletion
+    
     try {
       const { data, error } = await supabase.rpc('delete_quiz', { p_quiz_id: quizToDelete.id });
       if (error) throw error;
 
-      toast({ title: 'Success', description: `Quiz "${data.title}" deleted.` });
+      // Immediately update local state to reflect deletion
+      setQuizzes(prevQuizzes => prevQuizzes.filter(quiz => quiz.id !== quizToDelete.id));
+      
+      toast({ title: 'Success', description: `Quiz "${quizTitle}" has been deleted.` });
       setIsDeleteConfirmOpen(false);
       setQuizToDelete(null);
-      fetchQuizzes(); // Refresh list
+      
+      // Refresh list to ensure consistency
+      await fetchQuizzes();
     } catch (error: any) {
+      console.error('Delete quiz error:', error);
       toast({ title: 'Deletion Failed', description: error.message, variant: 'destructive' });
+      setIsDeleteConfirmOpen(false);
+      setQuizToDelete(null);
     }
   };
 

@@ -284,14 +284,30 @@ export function QuizAssignment() {
 
       if (error) throw error;
 
+      // Update local state immediately
+      setQuizzes(prevQuizzes => 
+        prevQuizzes.map(quiz => 
+          quiz.id === quizId ? { ...quiz, status: newStatus } : quiz
+        )
+      );
+      
+      setAssignments(prevAssignments =>
+        prevAssignments.map(assignment =>
+          assignment.quiz.id === quizId 
+            ? { ...assignment, quiz: { ...assignment.quiz, status: newStatus } }
+            : assignment
+        )
+      );
+
       toast({
         title: 'Quiz Status Updated',
         description: `Quiz status changed to "${newStatus}"`,
       });
       setIsStatusChangeDialogOpen(false);
       setQuizToChangeStatus(null);
-      fetchQuizzes(); // Refresh quizzes to show updated status
-      fetchAssignments(); // Also refresh assignments in case status affects their display
+      
+      // Refresh data to ensure consistency
+      await Promise.all([fetchQuizzes(), fetchAssignments()]);
     } catch (error: any) {
       console.error('Error updating quiz status:', error);
       toast({
