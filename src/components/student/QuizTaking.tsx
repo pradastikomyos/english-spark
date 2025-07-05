@@ -248,9 +248,13 @@ const QuizTaking = ({ quizId, onFinishQuiz }: QuizTakingProps) => {
                     )}
                   </div>
                   <div className="text-sm mt-2 pl-4 border-l-2 ml-2">
-                     <p className={item.is_correct ? 'text-gray-500' : 'text-red-600'}>Jawaban Anda: {item.student_answer ? `"${currentQuestion.options[item.student_answer]}"` : "Tidak dijawab"}</p>
+                    <p className={item.is_correct ? 'text-gray-500' : 'text-red-600'}>
+                      Jawaban Anda: {item.student_answer ? `"${questions.find(q => q.id === item.question_id)?.options[item.student_answer] || item.student_answer}"` : "Tidak dijawab"}
+                    </p>
                     {!item.is_correct && (
-                      <p className="text-green-600">Jawaban Benar: "{currentQuestion.options[item.correct_answer]}"</p>
+                      <p className="text-green-600">
+                        Jawaban Benar: "{questions.find(q => q.id === item.question_id)?.options[item.correct_answer] || item.correct_answer}"
+                      </p>
                     )}
                   </div>
                 </div>

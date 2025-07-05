@@ -101,7 +101,11 @@ export function StudyMaterials({ onStartMaterial }: StudyMaterialsProps) {
         }
       } else if (rpcData) {
         // RPC succeeded
-        const materialsWithParsedRating = rpcData.map(m => ({...m, rating: m.rating ? Number(m.rating) : 0}));
+        const materialsWithParsedRating = rpcData.map(m => ({
+          ...m, 
+          rating: m.rating ? Number(m.rating) : 0,
+          status: m.status || (m.is_completed ? 'completed' : 'not_started')
+        }));
         console.log('Processed materials:', materialsWithParsedRating);
         setMaterials(materialsWithParsedRating);
       } else {
