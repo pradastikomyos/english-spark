@@ -33,8 +33,11 @@ interface Quiz {
   points_per_question: number;
   created_by?: string;
   created_at: string;
-  questionCount: number; // Selalu ada, dihitung dari fetch
+  questionCount: number;
+  totalPoints: number;
   difficulty: 'easy' | 'medium' | 'hard' | 'mixed';
+  difficultyBreakdown: { easy: number; medium: number; hard: number };
+  pointBreakdown: { easy: number; medium: number; hard: number };
 }
 
 // State untuk form kuis
@@ -76,38 +79,72 @@ export default function QuizManagement() {
   const fetchQuizzes = async () => {
     setLoading(true);
     try {
+      const { data: { user } } = await supabase.auth.getUser();
+      const validProfileId = user?.id;
+
+      console.log('Using valid profileId:', validProfileId);
+
+      // Use the corrected function that filters by teacher_id (user_id)
       const { data, error } = await supabase
-        .from('quizzes')
-        .select(`*, questions(id, difficulty)`)
-        .eq('created_by', profileId)
-        .order('created_at', { ascending: false });
+        .rpc('get_quizzes_for_teacher', { teacher_id_param: validProfileId });
 
       if (error) throw error;
 
-      const quizzesWithCalculatedData = data.map((quiz: any): Quiz => {
+      // Get questions for each quiz separately with proper error handling
+      const quizzesWithQuestions = await Promise.all(
+        data.map(async (quiz: any) => {
+          try {
+            const { data: questions, error: questionsError } = await supabase
+              .from('questions')
+              .select('id, points, difficulty')
+              .eq('quiz_id', quiz.id);
+
+            if (questionsError) {
+              console.error('Error fetching questions for quiz', quiz.id, questionsError);
+              return { ...quiz, questions: [] };
+            }
+
+            console.log(`Questions for quiz ${quiz.id}:`, questions);
+            return { ...quiz, questions: questions || [] };
+          } catch (err) {
+            console.error('Exception fetching questions for quiz', quiz.id, err);
+            return { ...quiz, questions: [] };
+          }
+        })
+      );
+      
+      console.log('Fetched quizzes data:', quizzesWithQuestions);
+      console.log('First quiz data:', quizzesWithQuestions[0]);
+      console.log('First quiz questions:', quizzesWithQuestions[0]?.questions);
+
+      const quizzesWithCalculatedData = quizzesWithQuestions.map((quiz: any): Quiz => {
         const questions = quiz.questions || [];
         const questionCount = questions.length;
-        let difficulty: 'easy' | 'medium' | 'hard' | 'mixed' = 'easy'; // Default
+        const totalPoints = questions.reduce((sum: number, q: { points: number | null }) => sum + (q.points || 0), 0);
 
-        if (questionCount > 0) {
-          const uniqueDifficulties = new Set(questions.map((q: { difficulty: string }) => q.difficulty));
-          if (uniqueDifficulties.size > 1) {
-            difficulty = 'mixed';
-          } else {
-            // Ambil kesulitan dari satu-satunya jenis pertanyaan yang ada
-            difficulty = uniqueDifficulties.values().next().value || 'easy';
+        const difficultyBreakdown = { easy: 0, medium: 0, hard: 0 };
+        const pointBreakdown = { easy: 0, medium: 0, hard: 0 };
+
+        questions.forEach((q: { difficulty: 'easy' | 'medium' | 'hard'; points: number | null }) => {
+          if (q.difficulty) {
+            difficultyBreakdown[q.difficulty]++;
+            pointBreakdown[q.difficulty] += q.points || 0;
           }
-        }
+        });
         
         return {
           ...quiz,
           questionCount: questionCount,
-          difficulty: difficulty,
+          totalPoints: totalPoints,
+          difficulty: 'mixed', // Bisa dikembangkan untuk kalkulasi otomatis
+          difficultyBreakdown,
+          pointBreakdown,
         };
       });
 
       setQuizzes(quizzesWithCalculatedData);
     } catch (error: any) {
+      console.error('Error fetching quizzes:', error);
       toast({
         title: 'Error Fetching Quizzes',
         description: error.message,
@@ -126,11 +163,21 @@ export default function QuizManagement() {
     });
   };
 
-  // --- Handler CRUD ---
   const handleCreateQuiz = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
       const { title, description, time_limit } = quizForm;
+      
+      // Get teacher ID from teachers table
+      const { data: teacherData, error: teacherError } = await supabase
+        .from('teachers')
+        .select('id')
+        .eq('user_id', profileId)
+        .single();
+
+      if (teacherError) throw teacherError;
+      if (!teacherData) throw new Error('Teacher record not found');
+
       const { data, error } = await supabase
         .from('quizzes')
         .insert([
@@ -138,8 +185,9 @@ export default function QuizManagement() {
             title,
             description,
             time_limit,
-            points_per_question: 0, // Set default value to 0 or null if the column allows
-            created_by: profileId,
+            points_per_question: 0,
+            created_by: teacherData.id, // Use teacher.id for created_by
+            // teacher_id will be set automatically by trigger
           },
         ])
         .select()
@@ -149,7 +197,8 @@ export default function QuizManagement() {
 
       toast({ title: 'Success', description: `Quiz "${data.title}" created.` });
       setIsCreateDialogOpen(false);
-      fetchQuizzes(); // Refresh list
+      resetForm();
+      fetchQuizzes();
     } catch (error: any) {
       toast({ title: 'Creation Failed', description: error.message, variant: 'destructive' });
     }
@@ -171,7 +220,7 @@ export default function QuizManagement() {
 
       toast({ title: 'Success', description: `Quiz "${data.title}" updated.` });
       setIsEditDialogOpen(false);
-      fetchQuizzes(); // Refresh list
+      fetchQuizzes();
     } catch (error: any) {
       toast({ title: 'Update Failed', description: error.message, variant: 'destructive' });
     }
@@ -187,7 +236,7 @@ export default function QuizManagement() {
       toast({ title: 'Success', description: `Quiz "${quizToDelete.title}" deleted.` });
       setIsDeleteConfirmOpen(false);
       setQuizToDelete(null);
-      fetchQuizzes(); // Refresh list
+      fetchQuizzes();
     } catch (error: any) {
       toast({ title: 'Deletion Failed', description: error.message, variant: 'destructive' });
     }
@@ -308,7 +357,22 @@ export default function QuizManagement() {
                   <div className="grid grid-cols-3 gap-2 text-xs text-muted-foreground">
                     <div className="flex items-center gap-1" title="Number of Questions"><FileText className="h-3 w-3" /> {quiz.questionCount} Qs</div>
                     <div className="flex items-center gap-1" title="Time Limit"><Clock className="h-3 w-3" /> {formatTime(quiz.time_limit)}</div>
-
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <div className="flex items-center gap-1 cursor-pointer" title="Total Points & Breakdown">
+                          <Award className="h-3 w-3" /> {quiz.totalPoints} Pts
+                        </div>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <div className="text-sm">
+                          <p className="font-bold mb-1">Points Breakdown:</p>
+                          {quiz.pointBreakdown.easy > 0 && <div><span className="text-green-500 font-semibold">Easy:</span> {quiz.pointBreakdown.easy} pts ({quiz.difficultyBreakdown.easy} Qs)</div>}
+                          {quiz.pointBreakdown.medium > 0 && <div><span className="text-yellow-500 font-semibold">Medium:</span> {quiz.pointBreakdown.medium} pts ({quiz.difficultyBreakdown.medium} Qs)</div>}
+                          {quiz.pointBreakdown.hard > 0 && <div><span className="text-red-500 font-semibold">Hard:</span> {quiz.pointBreakdown.hard} pts ({quiz.difficultyBreakdown.hard} Qs)</div>}
+                          {quiz.totalPoints === 0 && <p className="text-muted-foreground">No points assigned yet.</p>}
+                        </div>
+                      </TooltipContent>
+                    </Tooltip>
                   </div>
                 </CardContent>
                 <CardFooter className="flex justify-between items-center pt-4 mt-auto bg-muted/30 px-4 py-2">

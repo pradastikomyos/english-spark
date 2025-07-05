@@ -1,138 +1,127 @@
 import { useState, useEffect } from 'react';
-import { useAuth } from '@/hooks/useAuth';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/lib/supabase';
-import { ArrowLeft, CheckCircle, XCircle } from 'lucide-react';
+import { ArrowLeft, CheckCircle, XCircle, Clock, Calendar } from 'lucide-react';
+import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
 
 interface QuizReviewProps {
   quizId: string;
   onBack: () => void;
 }
 
-interface Answer {
+interface ReviewResultBreakdownItem {
   question_id: string;
-  selected_option: string;
-  is_correct: boolean;
   question_text: string;
   options: Record<string, string>;
+  student_answer: string;
   correct_answer: string;
-  explanation: string | null;
+  is_correct: boolean;
+  explanation?: string | null;
 }
 
 interface ReviewData {
-  score: number;
-  total_questions: number;
-  time_taken: number;
-  completed_at: string;
   quiz_title: string;
-  answers: Answer[];
+  final_score: number;
+  base_score: number;
+  bonus_points: number;
+  time_taken_seconds: number;
+  submitted_at: string;
+  results_breakdown: ReviewResultBreakdownItem[];
 }
 
 export function QuizReview({ quizId, onBack }: QuizReviewProps) {
-  const { userId } = useAuth();
   const [reviewData, setReviewData] = useState<ReviewData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (userId && quizId) {
+    if (quizId) {
       fetchReviewData();
     }
-  }, [userId, quizId]);
+  }, [quizId]);
 
   const fetchReviewData = async () => {
     try {
       setLoading(true);
+      setError(null);
 
-      const { data: progressData, error: progressError } = await supabase
-        .from('user_progress')
-        .select('*, quizzes(title)')
-        .eq('user_id', userId)
-        .eq('quiz_id', quizId)
-        .order('completed_at', { ascending: false })
-        .limit(1)
-        .single();
+      const { data, error: rpcError } = await supabase.rpc('get_quiz_review_details', {
+        p_quiz_id: quizId,
+      });
 
-      if (progressError) {
-        // It's possible there's no progress yet, so don't throw, just return.
-        if (progressError.code === 'PGRST116') {
-          console.log('No progress found for this quiz yet.');
-          setReviewData(null);
-        } else {
-          throw progressError;
-        }
-        return; 
+      if (rpcError) throw rpcError;
+
+      if (!data || data.length === 0) {
+        throw new Error('Data ulasan untuk kuis ini tidak ditemukan. Mungkin Anda belum mengerjakannya.');
       }
 
-      if (progressError) throw progressError;
-
-      const { data: answersData, error: answersError } = await supabase
-        .from('user_answers' as any)
-        .select('*, questions!inner(question_text, options, correct_answer, explanation)')
-        .eq('user_progress_id', progressData.id);
-
-      if (answersError) throw answersError;
-
-      setReviewData({
-        score: progressData.score,
-        total_questions: progressData.total_questions,
-        time_taken: progressData.time_taken,
-        completed_at: progressData.completed_at,
-        quiz_title: (progressData.quizzes as any).title,
-        answers: (answersData as any[]).map(a => ({
-          question_id: a.question_id,
-          selected_option: a.selected_option,
-          is_correct: a.is_correct,
-          question_text: a.questions.question_text,
-          options: a.questions.options as Record<string, string>,
-          correct_answer: a.questions.correct_answer,
-          explanation: a.questions.explanation,
-        })),
-      });
+      setReviewData(data[0]);
 
     } catch (error: any) {
       console.error('Error fetching review data:', error);
+      setError(error.message || 'Terjadi kesalahan tidak diketahui');
     } finally {
       setLoading(false);
     }
   };
 
-  if (loading) return <div className="p-4">Loading review...</div>;
-  if (!reviewData) return <div className="p-4">Could not load review data.</div>;
+  if (loading) return <div className="p-4 text-center">Memuat ulasan...</div>;
+  if (error) return (
+    <div className="p-4 max-w-4xl mx-auto">
+       <Button onClick={onBack} variant="ghost" className="mb-4">
+        <ArrowLeft className="mr-2 h-4 w-4" />
+        Kembali
+      </Button>
+      <Alert variant="destructive">
+        <XCircle className="h-4 w-4" />
+        <AlertTitle>Gagal Memuat Data</AlertTitle>
+        <AlertDescription>{error}</AlertDescription>
+      </Alert>
+    </div>
+  );
+  if (!reviewData) return <div className="p-4 text-center">Data ulasan tidak tersedia.</div>;
+
+  const correctAnswersCount = reviewData.results_breakdown.filter(a => a.is_correct).length;
+  const totalQuestions = reviewData.results_breakdown.length;
+  const scorePercentage = totalQuestions > 0 ? (correctAnswersCount / totalQuestions) * 100 : 0;
 
   return (
     <div className="p-4 max-w-4xl mx-auto">
       <Button onClick={onBack} variant="ghost" className="mb-4">
         <ArrowLeft className="mr-2 h-4 w-4" />
-        Back to Dashboard
+        Kembali ke Dashboard
       </Button>
 
       <Card className="mb-6">
         <CardHeader>
-          <CardTitle className="text-2xl">Review: {reviewData.quiz_title}</CardTitle>
-          <CardDescription>
-            Completed on {new Date(reviewData.completed_at).toLocaleString()}
+          <CardTitle className="text-2xl">Ulasan: {reviewData.quiz_title}</CardTitle>
+          <CardDescription className="flex items-center gap-2 text-sm text-gray-500 mt-1">
+            <Calendar className="h-4 w-4"/> 
+            Selesai pada {new Date(reviewData.submitted_at).toLocaleString('id-ID')}
           </CardDescription>
         </CardHeader>
         <CardContent className="grid grid-cols-1 md:grid-cols-3 gap-4 text-center">
             <div className="p-4 bg-gray-50 rounded-lg">
-                <p className="text-sm text-gray-500">Score</p>
-                <p className="text-2xl font-bold">{reviewData.score}%</p>
+                <p className="text-sm text-gray-500">Skor Final</p>
+                <p className="text-2xl font-bold text-blue-600">{reviewData.final_score}</p>
+                <p className="text-xs text-gray-500">Dasar: {reviewData.base_score} + Bonus: {reviewData.bonus_points}</p>
             </div>
             <div className="p-4 bg-gray-50 rounded-lg">
-                <p className="text-sm text-gray-500">Time Taken</p>
-                <p className="text-2xl font-bold">{reviewData.time_taken}s</p>
+                <p className="text-sm text-gray-500">Waktu Pengerjaan</p>
+                <p className="text-2xl font-bold">{reviewData.time_taken_seconds} detik</p>
             </div>
             <div className="p-4 bg-gray-50 rounded-lg">
-                <p className="text-sm text-gray-500">Correct Answers</p>
-                <p className="text-2xl font-bold">{reviewData.answers.filter(a => a.is_correct).length} / {reviewData.total_questions}</p>
+                <p className="text-sm text-gray-500">Jawaban Benar</p>
+                <p className="text-2xl font-bold">{correctAnswersCount} / {totalQuestions}</p>
+                <p className="text-xs text-gray-500">({scorePercentage.toFixed(0)}%)</p>
             </div>
         </CardContent>
       </Card>
 
       <div className="space-y-4">
-        {reviewData.answers.map((answer, index) => (
+        {reviewData.results_breakdown.map((answer, index) => (
           <Card key={answer.question_id}>
             <CardHeader>
               <CardTitle className="flex items-center text-lg">
@@ -141,14 +130,14 @@ export function QuizReview({ quizId, onBack }: QuizReviewProps) {
                 ) : (
                   <XCircle className="mr-2 h-5 w-5 text-red-500" />
                 )}
-                Question {index + 1}
+                Pertanyaan {index + 1}
               </CardTitle>
             </CardHeader>
             <CardContent>
               <p className="font-semibold mb-4 text-base">{answer.question_text}</p>
               <div className="space-y-2">
                 {Object.entries(answer.options).map(([key, value]) => {
-                  const isSelected = key === answer.selected_option;
+                  const isSelected = key === answer.student_answer;
                   const isCorrect = key === answer.correct_answer;
                   
                   let optionStyle = 'border-gray-200';
@@ -165,12 +154,12 @@ export function QuizReview({ quizId, onBack }: QuizReviewProps) {
                       <span className="flex-1">{value}</span>
                       {isSelected && (
                         <Badge variant={isCorrect ? 'default' : 'destructive'} className="ml-auto">
-                          Your Answer
+                          Jawaban Anda
                         </Badge>
                       )}
                       {!isSelected && isCorrect && (
                         <Badge variant="secondary" className="ml-auto">
-                          Correct Answer
+                          Jawaban Benar
                         </Badge>
                       )}
                     </div>
@@ -179,7 +168,7 @@ export function QuizReview({ quizId, onBack }: QuizReviewProps) {
               </div>
               {answer.explanation && (
                 <div className="mt-4 p-3 bg-blue-50 border-l-4 border-blue-400 text-blue-800 rounded-r-lg">
-                  <p className="font-semibold">Explanation</p>
+                  <p className="font-semibold">Penjelasan</p>
                   <p>{answer.explanation}</p>
                 </div>
               )}

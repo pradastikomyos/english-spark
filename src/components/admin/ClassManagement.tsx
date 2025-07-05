@@ -39,11 +39,12 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { MoreHorizontal, PlusCircle } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { useClasses } from '@/hooks/useClasses';
 
 // Zod schema for form validation
 const classSchema = z.object({
   name: z.string().min(2, { message: 'Class name must be at least 2 characters.' }),
-  teacher_id: z.string().uuid({ message: 'You must select a teacher.' }).optional().or(z.literal('')),
+  teacher_id: z.string().uuid({ message: 'You must select a teacher.' }).nullable().optional(),
 });
 
 type ClassFormData = z.infer<typeof classSchema>;
@@ -53,6 +54,7 @@ interface Class {
   name: string;
   teacher_id: string | null;
   created_at: string;
+  teacher_name: string;
 }
 
 interface Teacher {
@@ -61,12 +63,6 @@ interface Teacher {
 }
 
 // API Functions
-const fetchClasses = async (): Promise<Class[]> => {
-  const { data, error } = await supabase.rpc('admin_get_all_classes');
-  if (error) throw new Error(error.message);
-  return data || [];
-};
-
 const fetchTeachers = async (): Promise<Teacher[]> => {
   const { data, error } = await supabase.from('teachers').select('id, name');
   if (error) throw new Error(error.message);
@@ -105,13 +101,10 @@ export function ClassManagement() {
 
   const form = useForm<ClassFormData>({
     resolver: zodResolver(classSchema),
-    defaultValues: { name: '', teacher_id: '' },
+    defaultValues: { name: '', teacher_id: null },
   });
 
-  const { data: classes, isLoading, error } = useQuery<Class[]>({
-    queryKey: ['classes'],
-    queryFn: fetchClasses,
-  });
+  const { data: classes, isLoading, error } = useClasses();
 
   const { data: teachers } = useQuery<Teacher[]>({
     queryKey: ['teachers'],
@@ -122,11 +115,11 @@ export function ClassManagement() {
     if (classToEdit) {
       form.reset({
         name: classToEdit.name,
-        teacher_id: classToEdit.teacher_id || '',
+        teacher_id: classToEdit.teacher_id || null,
       });
       setIsDialogOpen(true);
     } else {
-      form.reset({ name: '', teacher_id: '' });
+      form.reset({ name: '', teacher_id: null });
     }
   }, [classToEdit, form]);
 
@@ -221,15 +214,14 @@ export function ClassManagement() {
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Assign Teacher (Optional)</FormLabel>
-                      <Select onValueChange={field.onChange} defaultValue={field.value}>
+                      <Select onValueChange={field.onChange} value={field.value ?? ''}>
                         <FormControl>
                           <SelectTrigger>
                             <SelectValue placeholder="Select a teacher" />
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          <SelectItem value="">None</SelectItem>
-                          {teachers?.map((t) => (
+                          {teachers?.filter(t => t.id).map((t) => (
                             <SelectItem key={t.id} value={t.id}>
                               {t.name}
                             </SelectItem>

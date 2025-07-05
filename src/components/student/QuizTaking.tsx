@@ -5,6 +5,9 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
 import { Progress } from '@/components/ui/progress';
+import { CheckCircle, XCircle, Clock, Trophy } from 'lucide-react';
+import ImageZoom from '@/components/ui/image-zoom';
+import { DIFFICULTY_POINTS, calculateQuizScore, getTimeBonusTier } from '@/lib/gamification';
 
 // Define types for our data
 interface Question {
@@ -12,7 +15,7 @@ interface Question {
   question_text: string;
   media_url: string | null;
   options: Record<string, string>;
-  points: number;
+  difficulty: 'easy' | 'medium' | 'hard';
   correct_answer: string;
   explanation: string | null;
 }
@@ -27,6 +30,15 @@ interface QuizTakingProps {
   onFinishQuiz: () => void;
 }
 
+interface ResultBreakdownItem {
+  question_id: string;
+  question_text: string;
+  difficulty: 'easy' | 'medium' | 'hard';
+  student_answer: string;
+  correct_answer: string;
+  is_correct: boolean;
+}
+
 const QuizTaking = ({ quizId, onFinishQuiz }: QuizTakingProps) => {
   const [quiz, setQuiz] = useState<Quiz | null>(null);
   const [questions, setQuestions] = useState<Question[]>([]);
@@ -34,7 +46,9 @@ const QuizTaking = ({ quizId, onFinishQuiz }: QuizTakingProps) => {
   const [selectedAnswers, setSelectedAnswers] = useState<{ [key: string]: string }>({});
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [zoomedImageUrl, setZoomedImageUrl] = useState<string | null>(null);
+  const [timeRemaining, setTimeRemaining] = useState<number | null>(null);
+  const [startTime, setStartTime] = useState<Date | null>(null);
+  const [quizResult, setQuizResult] = useState<{ final_score: number; base_score: number; bonus_points: number; results_breakdown: ResultBreakdownItem[] } | null>(null);
 
   useEffect(() => {
     const fetchQuizData = async () => {
@@ -45,24 +59,19 @@ const QuizTaking = ({ quizId, onFinishQuiz }: QuizTakingProps) => {
       }
       setIsLoading(true);
       try {
-        // Fetch quiz details
-        const { data: quizData, error: quizError } = await supabase
-            .from('quizzes')
-            .select('title, description')
-            .eq('id', quizId)
-            .single();
+        const { data, error } = await supabase.rpc('get_quiz_details_for_student', {
+          p_quiz_id: quizId
+        });
 
-        if (quizError) throw quizError;
-        setQuiz(quizData);
+        if (error) throw error;
+        if (!data || data.length === 0) throw new Error('Quiz not found or has no questions.');
 
-        // Fetch questions and their options
-        const { data: questionsData, error: questionsError } = await supabase
-          .from('questions')
-          .select('id, question_text, media_url, points, options, correct_answer, explanation')
-          .eq('quiz_id', quizId);
+        const quizDetails = data[0];
+        setQuiz({ title: quizDetails.quiz_title, description: quizDetails.quiz_description });
+        setQuestions(quizDetails.questions || []);
+        setTimeRemaining(quizDetails.time_limit_seconds || null);
+        setStartTime(new Date());
 
-        if (questionsError) throw questionsError;
-        setQuestions(questionsData || []);
       } catch (err: any) {
         setError(err.message);
       } finally {
@@ -72,6 +81,23 @@ const QuizTaking = ({ quizId, onFinishQuiz }: QuizTakingProps) => {
 
     fetchQuizData();
   }, [quizId]);
+
+  useEffect(() => {
+    if (timeRemaining === null) return;
+
+    if (timeRemaining <= 0) {
+      if (!isLoading) {
+        handleSubmit();
+      }
+      return;
+    }
+
+    const timerId = setInterval(() => {
+      setTimeRemaining(prev => (prev ? prev - 1 : 0));
+    }, 1000);
+
+    return () => clearInterval(timerId);
+  }, [timeRemaining, isLoading]);
 
   const handleAnswerChange = (questionId: string, optionId: string) => {
     setSelectedAnswers(prev => ({ ...prev, [questionId]: optionId }));
@@ -90,74 +116,27 @@ const QuizTaking = ({ quizId, onFinishQuiz }: QuizTakingProps) => {
   };
 
   const handleSubmit = async () => {
+    if (isLoading) return; // Prevent multiple submissions
     setIsLoading(true);
     setError(null);
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
-        throw new Error('User not authenticated.');
+      const endTime = new Date();
+      const timeTaken = startTime ? Math.round((endTime.getTime() - startTime.getTime()) / 1000) : 0;
+
+      const { data, error } = await supabase.rpc('submit_quiz_attempt', {
+        p_quiz_id: quizId,
+        p_student_answers: selectedAnswers,
+        p_time_taken_seconds: timeTaken,
+      });
+
+      if (error) throw error;
+
+      if (data && data.length > 0) {
+        setQuizResult(data[0]);
+      } else {
+        // Fallback if RPC returns nothing
+        onFinishQuiz();
       }
-
-      let correctAnswersCount = 0;
-      let totalScore = 0;
-      const userAnswersToInsert = [];
-
-      for (const question of questions) {
-        const selectedOptionId = selectedAnswers[question.id];
-        const isCorrect = selectedOptionId === question.correct_answer;
-
-        if (isCorrect) {
-          correctAnswersCount++;
-          totalScore += question.points;
-        }
-
-        userAnswersToInsert.push({
-          user_id: user.id,
-          question_id: question.id,
-          selected_option: selectedOptionId,
-          is_correct: isCorrect,
-        });
-      }
-
-      // Calculate score percentage
-      const scorePercentage = questions.length > 0 ? (correctAnswersCount / questions.length) * 100 : 0;
-
-      // Get current time for time_taken (assuming you start a timer when quiz begins)
-      // For now, let's use a placeholder or calculate based on a start time if available
-      const timeTaken = 0; // TODO: Implement actual time tracking
-
-      // Insert user progress
-      const { data: progressData, error: progressError } = await supabase
-        .from('user_progress')
-        .insert({
-          user_id: user.id,
-          quiz_id: quizId,
-          score: scorePercentage,
-          total_questions: questions.length,
-          correct_answers: correctAnswersCount,
-          time_taken: timeTaken, // Placeholder
-          completed_at: new Date().toISOString(),
-        })
-        .select('id')
-        .single();
-
-      if (progressError) throw progressError;
-
-      // Link user answers to the progress entry
-      const answersWithProgressId = userAnswersToInsert.map(answer => ({
-        ...answer,
-        user_progress_id: progressData.id,
-      }));
-
-      const { error: insertAnswersError } = await supabase
-        .from('user_answers')
-        .insert(answersWithProgressId);
-
-      if (insertAnswersError) throw insertAnswersError;
-
-      // Call onFinishQuiz prop instead of navigating
-      onFinishQuiz();
-
     } catch (err: any) {
       setError(err.message);
       console.error('Submission error:', err);
@@ -166,12 +145,140 @@ const QuizTaking = ({ quizId, onFinishQuiz }: QuizTakingProps) => {
     }
   };
 
+    if (quizResult) {
+    // Calculate detailed score breakdown using gamification logic
+    const answers = quizResult.results_breakdown.map(item => ({
+      difficulty: item.difficulty,
+      isCorrect: item.is_correct
+    }));
+    
+    const endTime = new Date();
+    const timeTaken = startTime ? Math.round((endTime.getTime() - startTime.getTime()) / 1000) : 0;
+    const scoreDetails = calculateQuizScore(answers, timeTaken, 300); // Assuming 5 min time limit
+    const timeBonusTier = getTimeBonusTier(timeTaken, 300);
+
+    return (
+      <Card className="m-4 max-w-4xl mx-auto">
+        <CardHeader>
+          <CardTitle className="text-3xl font-bold text-center flex items-center justify-center gap-2">
+            <Trophy className="h-8 w-8 text-yellow-500" />
+            Kuis Selesai!
+          </CardTitle>
+          <CardDescription className="text-center text-lg">
+            Berikut adalah hasil Anda untuk "{quiz?.title}".
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-8">
+          {/* Total Points Display */}
+          <div className="text-center p-6 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg border">
+            <h2 className="text-2xl font-bold text-gray-700 mb-2">Total Poin</h2>
+            <p className="text-6xl font-extrabold text-blue-600">{scoreDetails.totalPoints}</p>
+            <p className="text-sm text-gray-500 mt-2">Poin yang Anda peroleh</p>
+          </div>
+
+          {/* Score Breakdown by Difficulty */}
+          <div>
+            <h3 className="text-xl font-bold mb-4">Rincian Skor per Tingkat Kesulitan</h3>
+            <div className="space-y-3">
+              <div className="flex justify-between items-center p-4 bg-green-50 border border-green-200 rounded-md">
+                <span className="font-semibold text-green-800">Easy (+{DIFFICULTY_POINTS.easy} poin)</span>
+                <span className="text-sm text-green-600">Benar {scoreDetails.easyQuestions} soal</span>
+                <span className="font-bold text-green-700">{scoreDetails.easyPoints} Poin</span>
+              </div>
+              <div className="flex justify-between items-center p-4 bg-yellow-50 border border-yellow-200 rounded-md">
+                <span className="font-semibold text-yellow-800">Medium (+{DIFFICULTY_POINTS.medium} poin)</span>
+                <span className="text-sm text-yellow-600">Benar {scoreDetails.mediumQuestions} soal</span>
+                <span className="font-bold text-yellow-700">{scoreDetails.mediumPoints} Poin</span>
+              </div>
+              <div className="flex justify-between items-center p-4 bg-red-50 border border-red-200 rounded-md">
+                <span className="font-semibold text-red-800">Hard (+{DIFFICULTY_POINTS.hard} poin)</span>
+                <span className="text-sm text-red-600">Benar {scoreDetails.hardQuestions} soal</span>
+                <span className="font-bold text-red-700">{scoreDetails.hardPoints} Poin</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Time Bonus Section */}
+          {scoreDetails.timeBonus > 0 && (
+            <div className="p-4 bg-purple-50 border border-purple-200 rounded-lg">
+              <h3 className="text-xl font-bold mb-2 flex items-center gap-2">
+                <Clock className="h-6 w-6 text-purple-600" />
+                Bonus Waktu
+              </h3>
+              <div className="flex justify-between items-center">
+                <div>
+                  <p className="font-semibold text-purple-800">
+                    {timeBonusTier?.label} ({timeBonusTier?.percentage}% waktu tersisa)
+                  </p>
+                  <p className="text-sm text-purple-600">Waktu penyelesaian: {Math.floor(timeTaken / 60)}:{(timeTaken % 60).toString().padStart(2, '0')}</p>
+                </div>
+                <span className="font-bold text-purple-700 text-2xl">+{scoreDetails.timeBonus} Poin</span>
+              </div>
+            </div>
+          )}
+
+          {/* Original Score Summary for comparison */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-center p-4 bg-gray-50 rounded-lg">
+            <div>
+              <p className="text-sm font-medium text-gray-500">Skor Dasar</p>
+              <p className="text-3xl font-bold">{quizResult.base_score.toFixed(0)}</p>
+            </div>
+            <div>
+              <p className="text-sm font-medium text-gray-500">Bonus Waktu</p>
+              <p className="text-3xl font-bold text-green-500">+{quizResult.bonus_points.toFixed(0)}</p>
+            </div>
+            <div>
+              <p className="text-lg font-medium text-gray-700">Skor Final Database</p>
+              <p className="text-3xl font-bold text-blue-600">{quizResult.final_score.toFixed(0)}</p>
+            </div>
+          </div>
+
+          {/* Answer Review */}
+          <div>
+            <h3 className="text-xl font-bold mb-4">Tinjauan Jawaban</h3>
+            <div className="space-y-4">
+              {quizResult.results_breakdown.map((item, index) => (
+                <div key={item.question_id} className="p-4 border rounded-lg">
+                  <div className="flex justify-between items-start">
+                    <p className="font-semibold flex-1">{index + 1}. {item.question_text}</p>
+                    {item.is_correct ? (
+                      <CheckCircle className="h-6 w-6 text-green-500 ml-4" />
+                    ) : (
+                      <XCircle className="h-6 w-6 text-red-500 ml-4" />
+                    )}
+                  </div>
+                  <div className="text-sm mt-2 pl-4 border-l-2 ml-2">
+                     <p className={item.is_correct ? 'text-gray-500' : 'text-red-600'}>Jawaban Anda: {item.student_answer ? `"${currentQuestion.options[item.student_answer]}"` : "Tidak dijawab"}</p>
+                    {!item.is_correct && (
+                      <p className="text-green-600">Jawaban Benar: "{currentQuestion.options[item.correct_answer]}"</p>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <Button onClick={onFinishQuiz} className="mt-6 w-full max-w-xs mx-auto flex">
+            Kembali ke Daftar Kuis
+          </Button>
+        </CardContent>
+      </Card>
+    );
+  }
+
   if (isLoading) return <div className="p-4">Loading quiz...</div>;
   if (error) return <div className="p-4 text-red-500">Error: {error}</div>;
   if (!quiz || questions.length === 0) return <div className="p-4">Quiz not found or has no questions.</div>;
 
   const currentQuestion = questions[currentQuestionIndex];
   const progress = ((currentQuestionIndex + 1) / questions.length) * 100;
+
+  const formatTime = (seconds: number | null) => {
+    if (seconds === null) return '--:--';
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+  };
 
   const renderMedia = (url: string) => {
     // YouTube video
@@ -194,16 +301,18 @@ const QuizTaking = ({ quizId, onFinishQuiz }: QuizTakingProps) => {
       );
     }
 
-    // Image
-    const isImage = /\.(jpeg|jpg|gif|png)$/i.test(url);
+    // Image - using ImageZoom component
+    const isImage = /\.(jpeg|jpg|gif|png)$/i.test(url) || url.startsWith('placeholder-');
     if (isImage) {
       return (
-        <img
-          src={url}
-          alt="Question media"
-          className="max-w-sm mx-auto my-4 rounded-md cursor-pointer transition-transform duration-200 hover:scale-105"
-          onClick={() => setZoomedImageUrl(url)}
-        />
+        <div className="flex justify-center my-4">
+          <ImageZoom
+            src={url}
+            alt="Question media"
+            className="max-w-sm rounded-md border"
+            title="Gambar Soal"
+          />
+        </div>
       );
     }
 
@@ -218,38 +327,51 @@ const QuizTaking = ({ quizId, onFinishQuiz }: QuizTakingProps) => {
 
     return (
     <div className="container mx-auto p-4 max-w-2xl">
-      {zoomedImageUrl && (
-        <div
-          className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50"
-          onClick={() => setZoomedImageUrl(null)}
-        >
-          <img
-            src={zoomedImageUrl}
-            alt="Zoomed media"
-            className="max-w-[90vw] max-h-[90vh] object-contain"
-            onClick={(e) => e.stopPropagation()}
-          />
-          <button
-            onClick={() => setZoomedImageUrl(null)}
-            className="absolute top-4 right-4 text-white text-4xl font-bold"
-          >
-            &times;
-          </button>
-        </div>
-      )}
-
       <Card>
         <CardHeader>
           <CardTitle className="text-2xl font-bold">{quiz.title}</CardTitle>
           <CardDescription>{quiz.description}</CardDescription>
           <div className="mt-4">
-            <Progress value={progress} />
+            <Progress value={progress} className="w-full" />
+            {timeRemaining !== null && (
+              <div className="flex justify-between items-center mt-2">
+                <div className="text-sm font-medium text-gray-600">
+                  <Clock className="inline h-4 w-4 mr-1" />
+                  Time Remaining: {formatTime(timeRemaining)}
+                </div>
+                <div className="text-xs text-gray-500">
+                  {(() => {
+                    const timeLimit = 300; // 5 minutes default
+                    const elapsed = startTime ? Math.round((Date.now() - startTime.getTime()) / 1000) : 0;
+                    const percentageUsed = (elapsed / timeLimit) * 100;
+                    
+                    if (percentageUsed <= 25) return "🚀 Lightning Fast (+30 bonus)";
+                    if (percentageUsed <= 50) return "⚡ Quick Thinker (+20 bonus)";
+                    if (percentageUsed <= 75) return "⏱️ Steady Pace (+10 bonus)";
+                    return "🕐 Take your time";
+                  })()}
+                </div>
+              </div>
+            )}
             <p className="text-sm text-center mt-1">Question {currentQuestionIndex + 1} of {questions.length}</p>
           </div>
         </CardHeader>
         <CardContent>
           <div className="my-4">
-            <p className="text-xl mt-2 font-semibold">{currentQuestion.question_text}</p>
+            <div className="flex items-center gap-3 mb-2">
+              <p className="text-xl font-semibold">{currentQuestion.question_text}</p>
+              <span
+                className={`capitalize px-2.5 py-0.5 text-xs font-bold rounded-full border ${
+                  {
+                    easy: 'bg-green-100 text-green-800 border-green-300',
+                    medium: 'bg-yellow-100 text-yellow-800 border-yellow-300',
+                    hard: 'bg-red-100 text-red-800 border-red-300',
+                  }[currentQuestion.difficulty] || 'bg-gray-100 text-gray-800 border-gray-300'
+                }`}
+              >
+                {currentQuestion.difficulty}
+              </span>
+            </div>
             {currentQuestion.media_url && renderMedia(currentQuestion.media_url)}
           </div>
           <RadioGroup

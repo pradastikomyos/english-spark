@@ -6,7 +6,7 @@ security definer set search_path = public
 as $$
 begin
     -- Check if the user is an admin
-    if not is_admin() then
+    if not is_admin(auth.uid()) then
         raise exception 'You are not authorized to perform this action.';
     end if;
 
@@ -36,7 +36,7 @@ as $$
 declare
     new_question questions;
 begin
-    if not is_admin() then
+    if not is_admin(auth.uid()) then
         raise exception 'You are not authorized to perform this action.';
     end if;
 
@@ -66,7 +66,7 @@ as $$
 declare
     updated_question questions;
 begin
-    if not is_admin() then
+    if not is_admin(auth.uid()) then
         raise exception 'You are not authorized to perform this action.';
     end if;
 
@@ -95,7 +95,7 @@ as $$
 declare
     deleted_question questions;
 begin
-    if not is_admin() then
+    if not is_admin(auth.uid()) then
         raise exception 'You are not authorized to perform this action.';
     end if;
 

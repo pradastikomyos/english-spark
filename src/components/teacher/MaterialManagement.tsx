@@ -23,11 +23,14 @@ interface StudyMaterial {
   teacher_id: string;
 }
 
+import { MaterialViewer } from '@/components/student/MaterialViewer';
+
 export default function MaterialManagement() {
   const [materials, setMaterials] = useState<StudyMaterial[]>([]);
   const [loading, setLoading] = useState(true);
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingMaterial, setEditingMaterial] = useState<MaterialFormValues | null>(null);
+  const [viewingMaterialId, setViewingMaterialId] = useState<string | null>(null);
   const { toast } = useToast();
 
   const fetchMaterials = useCallback(async () => {
@@ -112,6 +115,10 @@ export default function MaterialManagement() {
     }
   };
 
+  if (viewingMaterialId) {
+    return <MaterialViewer materialId={viewingMaterialId} onBack={() => setViewingMaterialId(null)} />;
+  }
+
   return (
     <Card>
       <CardHeader>
@@ -145,7 +152,14 @@ export default function MaterialManagement() {
               {materials.length > 0 ? (
                 materials.map((material) => (
                   <TableRow key={material.id}>
-                    <TableCell className="font-medium">{material.title}</TableCell>
+                    <TableCell className="font-medium">
+                      <button
+                        onClick={() => setViewingMaterialId(material.id)}
+                        className="text-blue-600 hover:underline text-left"
+                      >
+                        {material.title}
+                      </button>
+                    </TableCell>
                     <TableCell className="hidden md:table-cell">{material.type}</TableCell>
                     <TableCell className="hidden md:table-cell">{material.category}</TableCell>
                     <TableCell className="hidden lg:table-cell">{material.difficulty}</TableCell>

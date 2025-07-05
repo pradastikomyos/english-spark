@@ -29,7 +29,7 @@ begin
 
   if new_user_id is null then
     insert into auth.users (email, password, raw_user_meta_data, email_confirmed_at)
-    values (p_email, crypt(temp_password, gen_salt('bf')), jsonb_build_object('name', p_name, 'role', 'teacher'), now())
+    values (p_email, crypt(temp_password, gen_salt('bf')), jsonb_build_object('name', p_name, 'role', 'teacher', 'requires_password_change', true), now())
     returning id into new_user_id;
   end if;
 

@@ -10,10 +10,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/lib/supabase';
-import { Plus, FileText, CheckCircle, XCircle, Edit, Trash2 } from 'lucide-react';
+import { Plus, FileText, CheckCircle, XCircle, Edit, Trash2, ArrowLeft, Loader2 } from 'lucide-react';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import CreateQuestionForm from './CreateQuestionForm';
+import ImageZoom from '@/components/ui/image-zoom';
 
+// Interfaces
 interface Question {
   id: string;
   quiz_id: string;
@@ -21,11 +23,15 @@ interface Question {
   options: Record<string, string>;
   correct_answer: 'A' | 'B' | 'C' | 'D';
   explanation?: string;
-  points: number;
-  question_order: number;
-  created_at: string;
   difficulty: 'easy' | 'medium' | 'hard';
-  media_url: string | null; // Add media_url to Question interface
+  media_url?: string;
+  points: number;
+  created_at: string;
+}
+
+interface QuizDetails {
+  title: string;
+  description: string;
 }
 
 interface QuestionManagerProps {
@@ -46,7 +52,6 @@ export function QuestionManager({ quizId, quizTitle, onClose, onBack, isAdmin = 
   const [currentQuestion, setCurrentQuestion] = useState<Question | null>(null);
   const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
   const [questionToDelete, setQuestionToDelete] = useState<Question | null>(null);
-  const [zoomedImageUrl, setZoomedImageUrl] = useState<string | null>(null);
   
   const [questionForm, setQuestionForm] = useState({
     question_text: '',
@@ -69,25 +74,62 @@ export function QuestionManager({ quizId, quizTitle, onClose, onBack, isAdmin = 
       setLoading(true);
       console.log('🔍 Fetching questions for quiz:', quizId);
       
-      const query = isAdmin
-        ? supabase.rpc('get_questions_for_quiz_admin', { p_quiz_id: quizId })
-        : supabase
-            .from('questions')
-            .select('*, media_url')
-            .eq('quiz_id', quizId)
-            .order('question_order', { ascending: true });
+      // First, verify we can access this quiz
+      const { data: quizData, error: quizError } = await supabase
+        .from('quizzes')
+        .select('id, teacher_id')
+        .eq('id', quizId)
+        .single();
 
-      const { data, error } = await query;
+      if (quizError) {
+        console.error('❌ Quiz verification error:', quizError);
+        throw quizError;
+      }
 
-      if (error) throw error;
-        console.log('📝 Quiz questions:', data);
-        console.log('Fetched questions data:', data);
-      setQuestions((data || []) as any as Question[]);
+      console.log('Quiz data:', quizData);
+
+      // Get current user
+      const { data: { user } } = await supabase.auth.getUser();
+      console.log('Current user ID:', user?.id);
+      console.log('Quiz teacher_id:', quizData.teacher_id);
+
+      if (!user || quizData.teacher_id !== user.id) {
+        throw new Error('Access denied: You can only view questions for your own quizzes');
+      }
+
+      // Now fetch questions with a direct query (no RLS for this specific case)
+      const { data, error } = await supabase
+        .from('questions')
+        .select('*')
+        .eq('quiz_id', quizId)
+        .order('created_at', { ascending: true });
+
+      if (error) {
+        console.error('❌ Questions fetch error:', error);
+        throw error;
+      }
+
+      console.log('📝 Raw questions data:', data);
+      console.log('📝 Questions count:', data?.length || 0);
+      
+      // Transform data to match our interface
+      const transformedQuestions = (data || []).map((q: any) => ({
+        ...q,
+        options: q.options || {
+          A: q.option_a,
+          B: q.option_b,
+          C: q.option_c,
+          D: q.option_d
+        }
+      }));
+
+      console.log('📝 Transformed questions:', transformedQuestions);
+      setQuestions(transformedQuestions);
     } catch (error: any) {
       console.error('❌ Fetch questions error:', error);
       toast({
         title: 'Error',
-        description: 'Failed to fetch questions',
+        description: error.message || 'Failed to fetch questions',
         variant: 'destructive',
       });
     } finally {
@@ -258,16 +300,18 @@ export function QuestionManager({ quizId, quizTitle, onClose, onBack, isAdmin = 
       );
     }
 
-    // Image
-    const isImage = /\.(jpeg|jpg|gif|png)$/i.test(url);
+    // Image - using ImageZoom component
+    const isImage = /\.(jpeg|jpg|gif|png)$/i.test(url) || url.startsWith('placeholder-');
     if (isImage) {
       return (
-        <img
-          src={url}
-          alt="Question media"
-          className="max-w-xs max-h-48 object-contain my-2 rounded-md cursor-pointer transition-transform duration-200 hover:scale-105"
-          onClick={() => setZoomedImageUrl(url)}
-        />
+        <div className="my-2">
+          <ImageZoom
+            src={url}
+            alt="Question media"
+            className="max-w-xs max-h-48 object-contain rounded-md border"
+            title="Gambar Soal"
+          />
+        </div>
       );
     }
 
@@ -282,25 +326,6 @@ export function QuestionManager({ quizId, quizTitle, onClose, onBack, isAdmin = 
  
   return (
     <div className="space-y-6">
-      {zoomedImageUrl && (
-        <div
-          className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50"
-          onClick={() => setZoomedImageUrl(null)}
-        >
-          <img
-            src={zoomedImageUrl}
-            alt="Zoomed media"
-            className="max-w-[90vw] max-h-[90vh] object-contain"
-            onClick={(e) => e.stopPropagation()}
-          />
-          <button
-            onClick={() => setZoomedImageUrl(null)}
-            className="absolute top-4 right-4 text-white text-4xl font-bold"
-          >
-            &times;
-          </button>
-        </div>
-      )}
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-2xl font-bold">Question Management</h2>

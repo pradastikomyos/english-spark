@@ -21,8 +21,9 @@ interface MaterialDetails {
   difficulty: string;
   estimated_time: number;
   rating: number;
-  url?: string;
-  content?: string;
+  content_url?: string;
+  storage_path?: string;
+
   is_completed: boolean;
 }
 
@@ -37,15 +38,25 @@ export function MaterialViewer({ materialId, onBack }: MaterialViewerProps) {
       if (!materialId) return;
       try {
         setLoading(true);
+        const { data: authData, error: authError } = await supabase.auth.getUser();
+        if (authError || !authData.user) {
+          throw new Error('User not authenticated');
+        }
+
         const { data, error } = await supabase
-          .rpc('get_study_material_details', { p_material_id: materialId })
-          .single();
+          .rpc('get_study_materials_with_status');
 
         if (error) throw error;
         if (data) {
-          setMaterial(data as MaterialDetails);
+          const foundMaterial = (data as MaterialDetails[]).find(m => m.id === materialId);
+          if (foundMaterial) {
+            setMaterial(foundMaterial);
+            console.log('Material loaded in viewer:', foundMaterial); // Add this line
+          } else {
+            setError('Material not found.');
+          }
         } else {
-          setError('Material not found.');
+          setError('No materials found.');
         }
       } catch (err: any) {
         setError(err.message);
@@ -88,30 +99,127 @@ export function MaterialViewer({ materialId, onBack }: MaterialViewerProps) {
     }
   };
 
+  const AudioPlayer = ({ storagePath }: { storagePath: string }) => {
+    const [audioUrl, setAudioUrl] = useState<string>('');
+    const [loading, setLoading] = useState(true);
+    
+    useEffect(() => {
+      const getAudioUrl = async () => {
+        try {
+          const { data, error } = await supabase.storage
+            .from('study-materials')
+            .createSignedUrl(storagePath, 3600); // 1 hour expiry for audio
+          
+          if (error) {
+            console.error('Error creating signed URL for audio:', error);
+            setLoading(false);
+            return;
+          }
+          
+          if (data?.signedUrl) {
+            setAudioUrl(data.signedUrl);
+          }
+        } catch (err) {
+          console.error('Error getting audio URL:', err);
+        } finally {
+          setLoading(false);
+        }
+      };
+      
+      getAudioUrl();
+    }, [storagePath]);
+
+    if (loading) return <p>Loading audio...</p>;
+    if (!audioUrl) return <p>Audio file not available.</p>;
+    
+    return <audio controls src={audioUrl} className="w-full">Your browser does not support the audio element.</audio>;
+  };
+
   const renderContent = () => {
     if (!material) return null;
 
     switch (material.type) {
       case 'video':
         return (
-          <div className="aspect-w-16 aspect-h-9">
             <iframe
-              src={material.url?.replace('watch?v=', 'embed/')}
+              src={material.content_url ? `https://www.youtube.com/embed/${material.content_url.split('v=')[1]?.split('&')[0]}` : ''}
               title={material.title}
               frameBorder="0"
               allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
               allowFullScreen
-              className="w-full h-full rounded-lg"
+              className="w-full aspect-video rounded-b-lg"
             ></iframe>
-          </div>
         );
       case 'audio':
-        return <audio controls src={material.url} className="w-full">Your browser does not support the audio element.</audio>;
+        // Check if it's a Google Drive link or an uploaded audio file
+        if (material.content_url && material.content_url.includes('drive.google.com')) {
+          const googleDriveFileId = material.content_url?.match(/file\/d\/([a-zA-Z0-9_-]+)/)?.[1];
+          if (googleDriveFileId) {
+            return (
+              <iframe
+                src={`https://docs.google.com/embed/d/${googleDriveFileId}`}
+                width="100%"
+                height="300"
+                frameBorder="0"
+                allowFullScreen
+                className="rounded-lg"
+              ></iframe>
+            );
+          } else {
+            return <p>Invalid Google Drive audio link.</p>;
+          }
+        } else if (material.storage_path) {
+          return <AudioPlayer storagePath={material.storage_path} />;
+        }
+        return <p>Audio file not available.</p>;
       case 'pdf':
-        return <a href={material.url} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">Download or view PDF</a>;
+      case 'ppt':
+        if (material.storage_path) {
+          // Gunakan createSignedUrl untuk authenticated access
+          const handleDownload = async () => {
+            try {
+              const { data, error } = await supabase.storage
+                .from('study-materials')
+                .createSignedUrl(material.storage_path!, 60); // 60 seconds expiry
+              
+              if (error) {
+                console.error('Error creating signed URL:', error);
+                toast({
+                  title: 'Error',
+                  description: 'Failed to access file. Please try again.',
+                  variant: 'destructive',
+                });
+                return;
+              }
+              
+              if (data?.signedUrl) {
+                window.open(data.signedUrl, '_blank');
+              }
+            } catch (err) {
+              console.error('Error downloading file:', err);
+              toast({
+                title: 'Error',
+                description: 'Failed to download file. Please try again.',
+                variant: 'destructive',
+              });
+            }
+          };
+
+          return (
+            <Button 
+              onClick={handleDownload}
+              className="text-blue-600 hover:text-blue-800"
+              variant="link"
+            >
+              Download or view {material.type.toUpperCase()}
+            </Button>
+          );
+        }
+        return <p>File not available.</p>;
       case 'article':
       case 'interactive':
-        return <div className="prose max-w-none" dangerouslySetInnerHTML={{ __html: material.content || '' }} />;
+        return <p>Content not available. Please refer to the URL.</p>;
+
       default:
         return <p>Unsupported material type.</p>;
     }
@@ -139,10 +247,16 @@ export function MaterialViewer({ materialId, onBack }: MaterialViewerProps) {
             <div className="flex items-center gap-1"><Star className="h-4 w-4 text-yellow-400" /> {material.rating}</div>
           </div>
         </CardHeader>
-        <CardContent>
-          <div className="bg-gray-50 p-4 rounded-lg">
-            {renderContent()}
-          </div>
+        <CardContent className="p-0">
+          {material.type === 'video' ? (
+            renderContent()
+          ) : (
+            <div className="p-6">
+              <div className="bg-gray-50 p-4 rounded-lg">
+                {renderContent()}
+              </div>
+            </div>
+          )}
         </CardContent>
       </Card>
 

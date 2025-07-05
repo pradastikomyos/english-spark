@@ -38,10 +38,10 @@ interface StudyMaterial {
   category: string;
   difficulty: string;
   estimated_time: number; // in minutes
-  is_completed: boolean;
+  status: 'not_started' | 'in_progress' | 'completed';
   rating: number;
-  url?: string;
-  content?: string;
+  content_url?: string;
+
 }
 
 export function StudyMaterials({ onStartMaterial }: StudyMaterialsProps) {
@@ -64,16 +64,49 @@ export function StudyMaterials({ onStartMaterial }: StudyMaterialsProps) {
   const loadStudyMaterials = async () => {
     try {
       setLoading(true);
-      const { data, error } = await supabase.rpc('get_study_materials_with_status');
+      console.log('Loading study materials...');
+      
+      // Try RPC first
+      const { data: rpcData, error: rpcError } = await supabase.rpc('get_study_materials_with_status');
 
-      if (error) {
-        throw error;
-      }
+      console.log('RPC Response:', { data: rpcData, error: rpcError });
 
-      if (data) {
-        // Ensure rating is a number, default to 0 if null
-        const materialsWithParsedRating = data.map(m => ({...m, rating: m.rating ? Number(m.rating) : 0}));
+      if (rpcError) {
+        console.log('RPC failed, trying direct query...');
+        
+        // Fallback to direct query
+        const { data: directData, error: directError } = await supabase
+          .from('study_materials')
+          .select('id, title, description, type, category, difficulty, estimated_time, rating, created_at')
+          .order('created_at', { ascending: false });
+
+        console.log('Direct query response:', { data: directData, error: directError });
+
+        if (directError) {
+          throw directError;
+        }
+
+        if (directData) {
+          // Transform data to match expected format
+          const transformedData = directData.map(m => ({
+            ...m,
+            type: m.type || 'article',
+            status: 'not_started' as const,
+            rating: m.rating ? Number(m.rating) : 0
+          }));
+          console.log('Transformed materials:', transformedData);
+          setMaterials(transformedData);
+        } else {
+          setMaterials([]);
+        }
+      } else if (rpcData) {
+        // RPC succeeded
+        const materialsWithParsedRating = rpcData.map(m => ({...m, rating: m.rating ? Number(m.rating) : 0}));
+        console.log('Processed materials:', materialsWithParsedRating);
         setMaterials(materialsWithParsedRating);
+      } else {
+        console.log('No data returned from RPC');
+        setMaterials([]);
       }
 
     } catch (error: any) {
@@ -173,7 +206,7 @@ export function StudyMaterials({ onStartMaterial }: StudyMaterialsProps) {
     onStartMaterial(material.id);
   };
 
-  const completedCount = materials.filter(m => m.is_completed).length;
+  const completedCount = materials.filter(m => m.status === 'completed').length;
   const completionPercentage = materials.length > 0 ? (completedCount / materials.length) * 100 : 0;
 
   if (loading) {
@@ -239,6 +272,15 @@ export function StudyMaterials({ onStartMaterial }: StudyMaterialsProps) {
               <option value="conversation">Conversation</option>
               <option value="business">Business</option>
               <option value="pronunciation">Pronunciation</option>
+              {/* Dynamic categories from materials */}
+              {[...new Set(materials.map(m => m.category))]
+                .filter(cat => !['grammar', 'vocabulary', 'conversation', 'business', 'pronunciation'].includes(cat))
+                .map(category => (
+                  <option key={category} value={category}>
+                    {category.charAt(0).toUpperCase() + category.slice(1)}
+                  </option>
+                ))
+              }
             </select>
 
             {/* Difficulty Filter */}
@@ -267,7 +309,7 @@ export function StudyMaterials({ onStartMaterial }: StudyMaterialsProps) {
         ) : (
           filteredMaterials.map((material) => (
             <Card key={material.id} className={`transition-all hover:shadow-lg ${
-              material.is_completed ? 'ring-2 ring-green-200 bg-green-50' : ''
+              material.status === 'completed' ? 'ring-2 ring-green-200 bg-green-50' : ''
             }`}>
               <CardHeader className="pb-4">
                 <div className="flex items-start justify-between">
@@ -280,7 +322,7 @@ export function StudyMaterials({ onStartMaterial }: StudyMaterialsProps) {
                       {material.difficulty}
                     </Badge>
                   </div>
-                  {material.is_completed && (
+                  {material.status === 'completed' && (
                     <CheckCircle className="h-6 w-6 text-green-500" />
                   )}
                 </div>
@@ -325,9 +367,9 @@ export function StudyMaterials({ onStartMaterial }: StudyMaterialsProps) {
                   <Button
                     onClick={() => handleStartMaterial(material)}
                     className="w-full"
-                    variant={material.is_completed ? "outline" : "default"}
+                    variant={material.status === 'completed' ? "outline" : "default"}
                   >
-                    {material.is_completed ? (
+                    {material.status === 'completed' ? (
                       <>
                         <CheckCircle className="h-4 w-4 mr-2" />
                         Review

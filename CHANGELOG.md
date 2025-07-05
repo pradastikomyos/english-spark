@@ -1,8 +1,28 @@
 # Changelog
 
+## Versi 1.0.0
+
+### Fitur Baru
+- **Penyematan Audio Google Drive**: Guru sekarang dapat mengunggah materi audio melalui tautan Google Drive yang dapat disematkan langsung di MaterialViewer.
+- **Validasi URL Audio Google Drive**: Formulir pengunggahan materi sekarang memvalidasi bahwa tautan Google Drive yang disediakan untuk materi audio adalah tautan yang valid dan dapat dibagikan.
+
+### Perbaikan Bug
+- **Tombol Unduh/Lihat File Tidak Dapat Diklik**: Memperbaiki masalah di mana tombol unduh/lihat untuk file PDF dan PPT tidak dapat diklik. Ini melibatkan:
+    - Menambahkan `storage_path` ke antarmuka `MaterialDetails` di frontend.
+    - Memperbarui fungsi RPC `get_study_materials_with_status` di Supabase untuk mengembalikan `storage_path`.
+    - Memastikan `MaterialViewer` menggunakan URL publik dari Supabase Storage untuk file yang diunggah.
+- **Kebijakan RLS yang Kontradiktif**: Memperbaiki kebijakan RLS "Students can view study materials" pada tabel `public.study_materials` yang sebelumnya menggunakan peran `anon` tetapi membutuhkan `authenticated`, menyebabkan masalah akses bagi pengguna yang sudah login. Kebijakan sekarang dikonfigurasi dengan benar untuk peran `authenticated`.
+
+### Peningkatan
+- **Placeholder Dinamis Formulir Materi**: Bidang URL di formulir materi sekarang menampilkan placeholder yang berbeda tergantung pada tipe materi (YouTube/Vimeo untuk video, Google Drive untuk audio).
+
 ## [2025-07-03] - App Stabilization & Feature Fixes
 
 ### Fixed
+
+- **Student Quiz Access & Data Loading:**
+  - **Database Schema Mismatch:** Resolved a series of critical errors on the 'Assigned Quizzes' page where the application would crash due to attempts to access non-existent columns (`total_questions`, `time_taken`) in the `quiz_attempts` table. The frontend code was updated to match the actual database schema.
+  - **TypeScript Type Errors:** Fixed a persistent and complex TypeScript linting error where the `quiz` property, fetched via a Supabase join, was incorrectly inferred as an array. Implemented a robust type guard and a double type assertion (`as unknown as Type`) to ensure type safety and resolve the compiler error definitively.
 
 - **Leaderboard Functionality:**
   - **Complete Overhaul:** Resolved a series of complex, cascading bugs that prevented the student leaderboard from loading data, showing errors like `400 Bad Request`, `404 Not Found`, and `Failed to fetch data`.

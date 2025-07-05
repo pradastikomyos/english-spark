@@ -26,7 +26,7 @@ BEGIN
 
   IF new_user_id IS NULL THEN
     INSERT INTO auth.users (instance_id, id, aud, role, email, encrypted_password, email_confirmed_at, recovery_token, recovery_sent_at, last_sign_in_at, raw_app_meta_data, raw_user_meta_data, created_at, updated_at, confirmation_token, email_change, email_change_sent_at, confirmed_at)
-    VALUES (current_setting('app.instance_id')::uuid, uuid_generate_v4(), 'authenticated', 'authenticated', p_email, crypt(temp_password, gen_salt('bf')), now(), '', '1970-01-01', '1970-01-01', jsonb_build_object('provider', 'email', 'providers', '["email"]'), jsonb_build_object('name', p_name), now(), now(), '', '', '1970-01-01', now())
+    VALUES (current_setting('app.instance_id')::uuid, uuid_generate_v4(), 'authenticated', 'authenticated', p_email, crypt(temp_password, gen_salt('bf')), now(), '', '1970-01-01', '1970-01-01', jsonb_build_object('provider', 'email', 'providers', '["email"]'), jsonb_build_object('name', p_name, 'requires_password_change', true), now(), now(), '', '', '1970-01-01', now())
     RETURNING id INTO new_user_id;
   END IF;
 

@@ -3,6 +3,7 @@ import { Session, User } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
 import { useQueryClient } from '@tanstack/react-query';
 import { useToast } from './use-toast';
+import { useNavigate } from 'react-router-dom';
 
 export interface AuthContextType {
   user: User | null;
@@ -26,12 +27,17 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   
   const queryClient = useQueryClient();
   const { toast } = useToast();
+  const navigate = useNavigate();
 
   const signOut = useCallback(async () => {
-    await supabase.auth.signOut();
-    queryClient.clear();
-    window.location.assign('/');
-  }, [queryClient]);
+    const { error } = await supabase.auth.signOut();
+    if (error) {
+      console.error('Error signing out:', error);
+    } else {
+      queryClient.clear();
+      navigate('/login', { replace: true });
+    }
+  }, [queryClient, navigate]);
 
   useEffect(() => {
     const fetchUserProfile = async (user: User | null) => {
@@ -41,14 +47,37 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         return;
       }
       try {
-        const { data, error } = await supabase
+        // First, get the role from user_roles
+        const { data: roleData, error: roleError } = await supabase
           .from('user_roles')
-          .select('role, profile_id')
+          .select('role')
           .eq('user_id', user.id)
           .single();
-        if (error) throw error;
-        setRole(data?.role as 'admin' | 'teacher' | 'student' || null);
-        setProfileId(data?.profile_id || null);
+
+        if (roleError) throw roleError;
+        const userRole = roleData?.role as 'admin' | 'teacher' | 'student' || null;
+        setRole(userRole);
+
+        // If the user is a student, fetch their actual profile ID from the students table
+        if (userRole === 'student') {
+          const { data: studentData, error: studentError } = await supabase
+            .from('students')
+            .select('id') // Select the primary key of the student
+            .eq('user_id', user.id) // Find the student record using the auth user ID
+            .single();
+          if (studentError) throw studentError;
+          setProfileId(studentData?.id || null);
+        } else if (userRole === 'teacher') {
+            const { data: teacherData, error: teacherError } = await supabase
+            .from('teachers')
+            .select('id')
+            .eq('user_id', user.id)
+            .single();
+          if (teacherError) throw teacherError;
+          setProfileId(teacherData?.id || null);
+        } else {
+          setProfileId(null); // Admins or other roles might not have a profile ID
+        }
       } catch (error) {
         console.error("Error fetching user profile:", error);
         setRole(null);

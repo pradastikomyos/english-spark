@@ -30,6 +30,9 @@ const materialFormSchema = z.object({
   if (data.type === 'video' && (!data.url || !z.string().url().safeParse(data.url).success)) {
     ctx.addIssue({ code: 'custom', path: ['url'], message: 'A valid URL is required for video materials.' });
   }
+  if (data.type === 'audio' && (!data.url || !z.string().url().regex(/^https:\/\/drive\.google\.com\/file\/d\/[a-zA-Z0-9_-]+\/view\?usp=sharing$/).safeParse(data.url).success)) {
+    ctx.addIssue({ code: 'custom', path: ['url'], message: 'A valid Google Drive shareable link is required for audio materials.' });
+  }
   if (data.type === 'article' && (!data.content || data.content.length < 20)) {
     ctx.addIssue({ code: 'custom', path: ['content'], message: 'Article content must be at least 20 characters long.' });
   }
@@ -180,6 +183,7 @@ export function MaterialForm({ open, onOpenChange, onSave, initialData }: Materi
                           <SelectItem value="audio">Audio</SelectItem>
                           <SelectItem value="pdf">PDF</SelectItem>
                           <SelectItem value="ppt">PPT</SelectItem>
+
                           <SelectItem value="article">Article/Interactive</SelectItem>
                         </SelectContent>
                       </Select>
@@ -240,7 +244,7 @@ export function MaterialForm({ open, onOpenChange, onSave, initialData }: Materi
                 />
             </div>
             
-            {materialType === 'video' && (
+            {(materialType === 'video' || materialType === 'audio') && (
               <FormField
                 control={form.control}
                 name="url"
@@ -248,7 +252,7 @@ export function MaterialForm({ open, onOpenChange, onSave, initialData }: Materi
                   <FormItem>
                     <FormLabel>YouTube/Vimeo URL</FormLabel>
                     <FormControl>
-                      <Input placeholder="https://..." {...field} />
+                      <Input placeholder={materialType === 'video' ? "https://www.youtube.com/watch?v=..." : "https://drive.google.com/file/d/.../view?usp=sharing"} {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>

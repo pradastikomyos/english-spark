@@ -33,7 +33,7 @@ interface LeaderboardStudent {
   total_points: number;
   level: number;
   current_streak: number;
-  classes?: { name: string };
+  class_name?: string;
   rank: number;
   isCurrentUser: boolean;
 }
@@ -70,6 +70,28 @@ export function Leaderboard() {
     // If auth is finished and we have a profile, fetch the leaderboard data.
     if (!authLoading && profileId && userRole) {
       fetchData();
+
+      // Set up real-time subscription for leaderboard updates
+      const channel = supabase
+        .channel('leaderboard_updates')
+        .on(
+          'postgres_changes',
+          { 
+            event: '*', 
+            schema: 'public', 
+            table: 'students'
+          },
+          (payload) => {
+            console.log('Student leaderboard data updated!', payload);
+            // Re-fetch leaderboard data
+            fetchData();
+          }
+        )
+        .subscribe();
+
+      return () => {
+        supabase.removeChannel(channel);
+      };
     } 
     // If auth is finished but there's no profile (e.g., not logged in, or error), 
     // we should stop the loading spinner. The component will then render a message.
@@ -131,7 +153,6 @@ export function Leaderboard() {
 
         const rankedStudents: LeaderboardStudent[] = (studentsData || []).map((student: any, index) => ({
           ...student,
-          classes: Array.isArray(student.classes) ? student.classes[0] : student.classes,
           rank: index + 1,
           isCurrentUser: student.id === profileId,
         }));
@@ -381,8 +402,8 @@ export function Leaderboard() {
                                 <span className="ml-2 text-sm text-blue-600">(You)</span>
                               )}
                             </p>
-                            {student.classes && (
-                              <p className="text-sm text-gray-600">{student.classes.name}</p>
+                            {student.class_name && (
+                              <p className="text-sm text-gray-600">{student.class_name}</p>
                             )}
                           </div>
                         </div>

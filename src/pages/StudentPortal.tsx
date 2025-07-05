@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { StudentLayout } from '@/components/student/StudentLayout';
 import { StudentDashboard } from '@/components/student/StudentDashboard';
@@ -13,32 +12,60 @@ import Profile from '@/components/student/Profile';
 import { useToast } from '@/hooks/use-toast';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { QuizReview } from '@/components/student/QuizReview';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 
 export default function StudentPortal() {
+  const { quizId: quizIdParam } = useParams<{ quizId: string }>();
+  const navigate = useNavigate();
   const [currentPage, setCurrentPage] = useState('dashboard');
   const [selectedQuizId, setSelectedQuizId] = useState<string | null>(null);
   const [takingQuiz, setTakingQuiz] = useState(false);
   const [reviewingQuizId, setReviewingQuizId] = useState<string | null>(null);
   const [viewingMaterialId, setViewingMaterialId] = useState<string | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false); // State for sidebar
+  const [quizIdError, setQuizIdError] = useState<string | null>(null);
   const { toast } = useToast();
   const isMobile = useIsMobile();
   useEffect(() => {
     if (isMobile) {
-      setSidebarOpen(false); // Auto-close sidebar on page change in mobile
+      setSidebarOpen(false);
     }
-  }, [currentPage, isMobile]);
+
+    if (quizIdParam) {
+      if (quizIdParam === 'undefined' || quizIdParam === null || quizIdParam === '') {
+        setQuizIdError('Quiz ID tidak valid.');
+        setSelectedQuizId(null);
+        setTakingQuiz(false);
+        navigate('/student/dashboard', { replace: true });
+      } else {
+        setSelectedQuizId(quizIdParam);
+        setTakingQuiz(true);
+        setCurrentPage('quizTaking');
+        setQuizIdError(null);
+      }
+    } else {
+      if (takingQuiz) {
+        setSelectedQuizId(null);
+        setTakingQuiz(false);
+      }
+    }
+  }, [isMobile, quizIdParam, navigate, takingQuiz]);
 
   const handleStartQuiz = (quizId: string) => {
-    setSelectedQuizId(quizId);
-    setTakingQuiz(true);
+    if (!quizId || quizId === 'undefined') {
+      toast({
+        title: 'Quiz ID tidak valid',
+        description: 'Quiz tidak dapat dimulai karena ID tidak ditemukan.',
+        variant: 'destructive',
+      });
+      return;
+    }
+    navigate(`/student/quiz/${quizId}`);
   };
 
   const handleFinishQuiz = () => {
-    setSelectedQuizId(null);
-    setTakingQuiz(false);
-    setCurrentPage('assigned'); // Navigate to assigned quizzes page after finishing quiz
+    navigate('/student/assigned');
+    setCurrentPage('assigned');
     toast({
       title: "Quiz Submitted!",
       description: "Your answers have been recorded. Check your results in the assigned quizzes list.",
@@ -109,6 +136,8 @@ export default function StudentPortal() {
         return <StudentDashboard onStartQuiz={handleStartQuiz} onReviewQuiz={handleReviewQuiz} />;
       case 'assigned':
         return <AssignedQuizzes onStartQuiz={handleStartQuiz} onReviewQuiz={handleReviewQuiz} />;
+      case 'quizTaking':
+        return <QuizTaking quizId={selectedQuizId!} onFinishQuiz={handleFinishQuiz} />;
       case 'results':
         return <QuizResults />;
       case 'leaderboard':
@@ -123,6 +152,20 @@ export default function StudentPortal() {
         return <StudentDashboard onStartQuiz={handleStartQuiz} onReviewQuiz={handleReviewQuiz} />;
     }
   };
+
+  if (quizIdError) {
+    return (
+      <StudentLayout
+        currentPage={currentPage}
+        onPageChange={setCurrentPage}
+        sidebarOpen={sidebarOpen}
+        setSidebarOpen={setSidebarOpen}
+        isTakingQuiz={false}
+      >
+        <div style={{ color: 'red', fontSize: 24, margin: '2rem' }}>Error: {quizIdError}</div>
+      </StudentLayout>
+    );
+  }
 
   return (
     <StudentLayout

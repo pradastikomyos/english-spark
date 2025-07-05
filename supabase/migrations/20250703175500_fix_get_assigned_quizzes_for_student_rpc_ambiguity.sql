@@ -1,5 +1,5 @@
 -- Create the get_assigned_quizzes_for_student RPC function
-CREATE OR REPLACE FUNCTION get_assigned_quizzes_for_student()
+CREATE OR REPLACE FUNCTION get_assigned_quizzes_for_student(p_student_id uuid)
 RETURNS TABLE (
     id UUID,
     quiz_id UUID,
@@ -19,7 +19,7 @@ BEGIN
     -- Get the student_id and class_id for the currently authenticated user
     SELECT s.id, s.class_id INTO v_student_id, v_class_id
     FROM public.students s
-    WHERE s.user_id = auth.uid();
+    WHERE s.id = p_student_id;
 
     -- If the user is not a student or has no class, return empty
     IF v_student_id IS NULL OR v_class_id IS NULL THEN
@@ -64,4 +64,4 @@ END;
 $$;
 
 -- Grant execute permission to the authenticated role
-GRANT EXECUTE ON FUNCTION get_assigned_quizzes_for_student() TO authenticated;
+GRANT EXECUTE ON FUNCTION get_assigned_quizzes_for_student(p_student_id uuid) TO authenticated;

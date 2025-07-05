@@ -241,25 +241,6 @@ serve(async (req) => {
       const teacherId = teacherProfile.id;
 
       // Insert the quiz and get its ID
-      const { data: newQuiz, error: quizError } = await supabaseAdminClient
-        .from('quizzes')
-        .insert({
-          title,
-          description,
-          total_questions: questions.length,
-          created_by: teacherId, // CRITICAL FIX: Use the teacher's ID
-        })
-        .select('id, created_at')
-        .single();
-
-      if (quizError) {
-        console.error('Error inserting quiz:', quizError);
-        throw quizError;
-      }
-
-      const quizId = newQuiz.id;
-      console.log(`Successfully created quiz with ID: ${quizId}`);
-
       // Helper function to get points based on difficulty
       const getPointsForDifficulty = (difficulty: string): number => {
         switch (difficulty.toLowerCase()) {
@@ -280,7 +261,7 @@ serve(async (req) => {
           const correctAnswer = String(q.correct_answer_key || 'A').toUpperCase();
           const difficulty = (['easy', 'medium', 'hard'].includes(q.difficulty?.toLowerCase()) ? q.difficulty.toLowerCase() : 'medium');
           return {
-            quiz_id: quizId,
+            quiz_id: '', // Temporarily empty, will be filled after quiz insertion
             question_text: q.question_text,
             options: q.options,
             correct_answer: correctAnswer,
@@ -290,6 +271,30 @@ serve(async (req) => {
           };
         })
         .filter((q: any) => q !== null);
+
+      // Insert the quiz and get its ID
+      const { data: newQuiz, error: quizError } = await supabaseAdminClient
+        .from('quizzes')
+        .insert({
+          title,
+          description,
+          total_questions: questionsToInsert.length,
+          created_by: teacherId, // CRITICAL FIX: Use the teacher's ID
+          total_points: questionsToInsert.reduce((sum: number, q: any) => sum + q.points, 0), // Calculate total points
+        })
+        .select('id, created_at, total_points')
+        .single();
+
+      if (quizError) {
+        console.error('Error inserting quiz:', quizError);
+        throw quizError;
+      }
+
+      const quizId: string = newQuiz.id;
+      console.log(`Successfully created quiz with ID: ${quizId}`);
+
+      // Assign quiz_id to questionsToInsert
+      questionsToInsert.forEach((q: any) => q.quiz_id = quizId);
 
       if (questionsToInsert.length === 0) {
         await supabaseAdminClient.from('quizzes').delete().eq('id', quizId);
@@ -317,6 +322,7 @@ serve(async (req) => {
         description,
         created_at: newQuiz.created_at,
         total_questions: questionsToInsert.length,
+        total_points: newQuiz.total_points, // Include total_points in the response
         questionCount: questionsToInsert.length,
       };
 
@@ -325,21 +331,21 @@ serve(async (req) => {
         status: 200,
       });
 
-    } catch (error) {
+    } catch (error: unknown) {
       console.error('Error in create-quiz-from-file function:', error);
-      return new Response(JSON.stringify({ error: error.message }), {
+      return new Response(JSON.stringify({ error: (error as Error).message }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 500,
       });
     }
-  } catch (error) {
+  } catch (error: unknown) {
     console.error('Error in create-quiz-from-file function:', error);
     console.error('Full error details:', {
-      message: error.message,
-      stack: error.stack,
-      cause: error.cause
+      message: (error as Error).message,
+      stack: (error as Error).stack,
+      cause: (error as Error).cause
     });
-    return new Response(JSON.stringify({ error: error.message }), {
+    return new Response(JSON.stringify({ error: (error as Error).message }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 500,
     });

@@ -11,7 +11,7 @@ DECLARE
     class_id_elem UUID;
 BEGIN
     -- Check if the user is an admin
-    IF NOT is_admin() THEN
+    IF NOT is_admin(auth.uid()) THEN
         RAISE EXCEPTION 'Only administrators can assign quizzes.';
     END IF;
 

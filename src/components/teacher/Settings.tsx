@@ -14,7 +14,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 
 // Zod schema for password change validation
 const passwordSchema = z.object({
-  newPassword: z.string().min(8, { message: "Password must be at least 8 characters." }),
+  newPassword: z.string().min(6, { message: "Password must be at least 6 characters." }),
   confirmPassword: z.string(),
 }).refine(data => data.newPassword === data.confirmPassword, {
   message: "Passwords don't match",
@@ -36,8 +36,8 @@ const Settings: React.FC = () => {
 
   const { mutate: updatePassword, isPending } = useMutation({
     mutationFn: async (passwordData: PasswordFormData) => {
-      const { error } = await supabase.rpc('update_user_password', {
-        new_password: passwordData.newPassword,
+      const { error } = await supabase.auth.updateUser({
+        password: passwordData.newPassword,
       });
       if (error) throw error;
     },

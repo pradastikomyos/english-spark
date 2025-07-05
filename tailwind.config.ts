@@ -61,8 +61,33 @@ export default {
 					'accent-foreground': 'hsl(var(--sidebar-accent-foreground))',
 					border: 'hsl(var(--sidebar-border))',
 					ring: 'hsl(var(--sidebar-ring))'
-				}
+				},
+        // Custom Claymorphism Colors
+        'brand': {
+          blue: 'var(--primary-blue)',
+          purple: 'var(--primary-purple)',
+          green: 'var(--primary-green)',
+        },
+        'text': {
+          DEFAULT: 'var(--text-primary)',
+          primary: 'var(--text-primary)',
+          secondary: 'var(--text-secondary)',
+          muted: 'var(--text-muted)',
+          inverse: 'var(--text-inverse)',
+        },
+        'clay': {
+          shadow: 'var(--clay-shadow)',
+          highlight: 'var(--clay-highlight)',
+        }
 			},
+      backgroundImage: {
+        'gradient-primary': 'var(--gradient-primary)',
+        'gradient-success': 'var(--gradient-success)',
+        'gradient-warning': 'var(--gradient-warning)',
+        'level-progress': 'var(--level-progress)',
+        'clay-light': 'var(--clay-light)',
+        'bg-primary': 'var(--bg-primary)',
+      },
 			borderRadius: {
 				lg: 'var(--radius)',
 				md: 'calc(var(--radius) - 2px)',

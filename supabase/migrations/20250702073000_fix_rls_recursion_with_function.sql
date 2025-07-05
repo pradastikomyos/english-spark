@@ -9,7 +9,7 @@ DROP POLICY IF EXISTS "Admins can view all teachers" ON public.teachers;
 -- 2. Create a SECURITY DEFINER function to check for admin role.
 -- This function runs with the permissions of the user who defined it (the owner),
 -- bypassing the RLS checks of the calling user and breaking the recursion cycle.
-CREATE OR REPLACE FUNCTION public.is_admin()
+CREATE OR REPLACE FUNCTION public.is_admin(p_user_id uuid)
 RETURNS BOOLEAN
 LANGUAGE sql
 SECURITY DEFINER
@@ -18,7 +18,7 @@ AS $$
   SELECT EXISTS (
     SELECT 1
     FROM user_roles
-    WHERE user_id = auth.uid() AND role = 'admin'
+    WHERE user_id = p_user_id AND role = 'admin'
   );
 $$;
 

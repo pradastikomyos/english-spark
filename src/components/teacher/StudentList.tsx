@@ -31,7 +31,12 @@ export function StudentList() {
   const fetchStudents = async () => {
     setLoading(true);
     try {
-      const { data, error } = await supabase.rpc('get_students_for_teacher');
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("User not authenticated");
+
+      const { data, error } = await supabase.rpc('get_students_for_teacher', {
+        p_teacher_id: user.id,
+      });
 
       if (error) throw error;
 

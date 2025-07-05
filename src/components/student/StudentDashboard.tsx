@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
@@ -66,6 +65,43 @@ export function StudentDashboard({ onStartQuiz, onReviewQuiz }: StudentDashboard
   useEffect(() => {
     if (profileId) {
       fetchDashboardData();
+
+      // Set up real-time subscription for student data updates
+      const channel = supabase
+        .channel(`student_dashboard:${profileId}`)
+        .on(
+          'postgres_changes',
+          { 
+            event: '*', 
+            schema: 'public', 
+            table: 'students',
+            filter: `id=eq.${profileId}`
+          },
+          (payload) => {
+            console.log('Student data updated!', payload);
+            // Re-fetch dashboard data
+            fetchDashboardData();
+          }
+        )
+        .on(
+          'postgres_changes',
+          { 
+            event: '*', 
+            schema: 'public', 
+            table: 'quiz_attempts',
+            filter: `student_id=eq.${profileId}`
+          },
+          (payload) => {
+            console.log('Quiz progress updated!', payload);
+            // Re-fetch dashboard data
+            fetchDashboardData();
+          }
+        )
+        .subscribe();
+
+      return () => {
+        supabase.removeChannel(channel);
+      };
     }
   }, [profileId]);
 
@@ -82,7 +118,7 @@ export function StudentDashboard({ onStartQuiz, onReviewQuiz }: StudentDashboard
 
       // Fetch recent quiz attempts
       const { data: recentQuizzes } = await supabase
-        .from('user_progress')
+        .from('quiz_attempts')
         .select(`
           *,
           quizzes:quiz_id(title, difficulty)
@@ -127,9 +163,9 @@ export function StudentDashboard({ onStartQuiz, onReviewQuiz }: StudentDashboard
       // Check completion status for assigned quizzes
       const assignedQuizIds = assignedQuizzes.map(q => q.quiz_id);
       const { data: completedQuizzes } = await supabase
-        .from('user_progress')
+        .from('quiz_attempts')
         .select('quiz_id')
-        .eq('user_id', user?.id)
+        .eq('student_id', profileId)
         .in('quiz_id', assignedQuizIds);
 
       const completedQuizIds = completedQuizzes?.map(c => c.quiz_id) || [];

@@ -1,5 +1,3 @@
-
-import { useState } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
 import { 
@@ -38,7 +36,7 @@ export function TeacherLayout({ children, currentPage, onPageChange, sidebarOpen
   ];
 
   return (
-    <div className="min-h-screen bg-background flex">
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex">
       {/* Mobile sidebar backdrop */}
       {sidebarOpen && (
         <div
@@ -50,31 +48,27 @@ export function TeacherLayout({ children, currentPage, onPageChange, sidebarOpen
       {/* Sidebar */}
       <div
         className={cn(
-          'fixed inset-y-0 left-0 z-50 w-64 bg-card shadow-lg transform transition-transform duration-300 ease-in-out lg:translate-x-0 lg:static lg:inset-0',
+          'fixed inset-y-0 left-0 z-50 w-64 bg-white dark:bg-gray-800 shadow-md transform transition-transform duration-300 ease-in-out lg:translate-x-0 lg:static lg:inset-0',
           sidebarOpen ? 'translate-x-0' : '-translate-x-full'
         )}
       >
-        <div className="flex items-center justify-between h-16 px-6 border-b border-gray-200">
-          <div className="flex items-center gap-2">
-            <div className="bg-blue-600 p-2 rounded-lg">
-              <LayoutDashboard className="h-6 w-6 text-white" />
+        <div className="flex items-center h-20 px-6">
+          <div className="flex items-center gap-3">
+            <div className="bg-purple-100 dark:bg-purple-900/50 p-3 rounded-lg">
+              <BookOpen className="h-6 w-6 text-purple-600 dark:text-purple-300" />
             </div>
-            <h1 className="text-xl font-bold text-gray-900">Teacher Portal</h1>
+            <div>
+              <h1 className="text-lg font-bold text-gray-800 dark:text-white">English Spark</h1>
+              <p className="text-xs text-gray-500 dark:text-gray-400">Teacher Portal</p>
+            </div>
           </div>
-          <Button
-            variant="ghost"
-            size="sm"
-            className="lg:hidden"
-            onClick={() => setSidebarOpen(false)}
-          >
-            <X className="h-5 w-5" />
-          </Button>
         </div>
 
-        <nav className="mt-6 px-3">
-          <div className="space-y-1">
+        <nav className="mt-4 px-4 flex flex-col h-[calc(100%-5rem)]">
+          <div className="space-y-2 flex-grow">
             {navigation.map((item) => {
               const Icon = item.icon;
+              const isActive = currentPage === item.id;
               return (
                 <button
                   key={item.id}
@@ -83,28 +77,27 @@ export function TeacherLayout({ children, currentPage, onPageChange, sidebarOpen
                     setSidebarOpen(false);
                   }}
                   className={cn(
-                    'w-full flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-lg transition-colors',
-                    currentPage === item.id
-                      ? 'bg-blue-50 text-blue-700 border-r-2 border-blue-700'
-                      : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
+                    'w-full flex items-center gap-3 px-3 py-2.5 text-sm font-medium rounded-lg transition-all duration-200',
+                    isActive
+                      ? 'bg-purple-100/80 dark:bg-purple-900/60 text-purple-700 dark:text-purple-200 border border-purple-200 dark:border-purple-800'
+                      : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
                   )}
                 >
                   <Icon className="h-5 w-5" />
-                  {item.name}
+                  <span>{item.name}</span>
                 </button>
               );
             })}
           </div>
 
-          <div className="mt-auto pt-6 border-t border-gray-200">
-            <Button
-              variant="ghost"
+          <div className="py-4">
+            <button
               onClick={signOut}
-              className="w-full justify-start text-red-600 hover:text-red-700 hover:bg-red-50"
+              className="w-full flex items-center gap-3 px-3 py-2.5 text-sm font-medium rounded-lg transition-colors text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
             >
-              <LogOut className="h-5 w-5 mr-3" />
-              Sign Out
-            </Button>
+              <LogOut className="h-5 w-5" />
+              <span>Sign Out</span>
+            </button>
           </div>
         </nav>
       </div>
@@ -112,15 +105,16 @@ export function TeacherLayout({ children, currentPage, onPageChange, sidebarOpen
       {/* Main content */}
       <div className="flex-1 flex flex-col">
         {/* Top bar */}
-        <div className="sticky top-0 z-10 bg-background/80 backdrop-blur-sm shadow-sm border-b border-border">
+        <div className="sticky top-0 z-30 bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm border-b border-gray-200 dark:border-gray-700">
           <div className="flex items-center justify-between h-16 px-6">
             <Button
               variant="ghost"
-              size="sm"
-              className="lg:hidden"
+              size="icon"
+              className="lg:hidden text-gray-600 dark:text-gray-300"
               onClick={() => setSidebarOpen(true)}
             >
-              <Menu className="h-5 w-5" />
+              <Menu className="h-6 w-6" />
+              <span className="sr-only">Open sidebar</span>
             </Button>
             <div className="flex-1"></div>
             <div className="flex items-center gap-4">
@@ -130,8 +124,10 @@ export function TeacherLayout({ children, currentPage, onPageChange, sidebarOpen
         </div>
 
         {/* Page content */}
-        <main className="p-6 flex-1">
-          {children}
+        <main className="p-6 flex-1 bg-gray-50 dark:bg-gray-900">
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6 min-h-[calc(100vh-10rem)]">
+            {children}
+          </div>
         </main>
       </div>
     </div>

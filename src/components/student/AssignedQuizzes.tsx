@@ -31,7 +31,7 @@ import {
 } from 'lucide-react';
 
 interface AssignedQuiz {
-  id: string;
+  assignment_id: string;
   quiz_id: string;
   class_id: string;
   assigned_at: string;
@@ -43,13 +43,12 @@ interface AssignedQuiz {
     difficulty: 'easy' | 'medium' | 'hard';
     time_limit: number;
     points_per_question: number;
-    status: 'open' | 'closed'; // Tambahkan status quiz
+    status: 'open' | 'closed';
   };  completion?: {
     id: string;
     score: number;
     completed_at: string;
-    total_questions: number;
-    time_taken?: number;
+
   };
 }
 
@@ -64,9 +63,6 @@ export function AssignedQuizzes({ onStartQuiz, onReviewQuiz }: AssignedQuizzesPr
   const [assignments, setAssignments] = useState<AssignedQuiz[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<'all' | 'pending' | 'completed'>('all');
-  const [showConfirmDialog, setShowConfirmDialog] = useState(false);
-  const [quizToStartId, setQuizToStartId] = useState<string | null>(null);
-
   useEffect(() => {
     if (profileId) {
       fetchAssignedQuizzes();
@@ -74,30 +70,78 @@ export function AssignedQuizzes({ onStartQuiz, onReviewQuiz }: AssignedQuizzesPr
   }, [profileId]);
 
   const fetchAssignedQuizzes = async () => {
+    if (!profileId) return;
+
+    setLoading(true);
     try {
-      setLoading(true);
-      const { data, error } = await supabase.rpc('get_assigned_quizzes_for_student');
+      // 1. Get student's class_id
+      const { data: studentData, error: studentError } = await supabase
+        .from('students')
+        .select('class_id')
+        .eq('id', profileId)
+        .single();
 
-      if (error) throw error;
+      if (studentError || !studentData?.class_id) {
+        setAssignments([]);
+        return;
+      }
+      
+      const { class_id: classId } = studentData;
 
-      const enrichedAssignments = (data || []).map((assignment: any) => ({
-        ...assignment,
-        quiz: {
-          ...assignment.quiz,
-          status: (assignment.quiz.status || 'open') as 'open' | 'closed',
-        },
-        completion: assignment.completion,
-      }));
+      // 2. Get all quizzes assigned to the student's class
+      const { data: classQuizzesData, error: classQuizzesError } = await supabase
+        .from('class_quizzes')
+        .select('assignment_id:id, quiz_id, class_id, assigned_at, due_date, quiz:quizzes!inner(*)')
+        .eq('class_id', classId);
 
-      setAssignments(enrichedAssignments);
+      if (classQuizzesError || !classQuizzesData) {
+        setAssignments([]);
+        return;
+      }
+
+      // 3. Filter for valid assignments where 'quiz' is a single object, not an array or null.
+      const validAssignments = classQuizzesData.filter(
+        (a) => a.quiz != null && !Array.isArray(a.quiz)
+      );
+
+      if (validAssignments.length === 0) {
+        setAssignments([]);
+        return;
+      }
+
+      const assignedQuizIds = validAssignments.map(a => a.quiz_id);
+
+      const { data: attemptsData, error: attemptsError } = await supabase
+        .from('quiz_attempts')
+        .select('id, quiz_id, score:final_score, completed_at')
+        .eq('student_id', profileId)
+        .in('quiz_id', assignedQuizIds);
+
+      if (attemptsError) {
+        console.error('Error fetching quiz attempts:', attemptsError);
+      }
+
+      // 4. Merge data safely, using a double cast via 'unknown' as recommended by the TS error.
+      const mergedAssignments: AssignedQuiz[] = validAssignments.map(assignment => {
+        const completion = attemptsData?.find(c => c.quiz_id === assignment.quiz_id);
+        
+        return {
+          assignment_id: assignment.assignment_id,
+          quiz_id: assignment.quiz_id,
+          class_id: assignment.class_id,
+          assigned_at: assignment.assigned_at,
+          due_date: assignment.due_date,
+          // The filter at step 3 ensures `quiz` is a valid object. The double cast tells TypeScript to trust our runtime check.
+          quiz: assignment.quiz as unknown as AssignedQuiz['quiz'],
+          completion: completion || undefined,
+        };
+      });
+
+      setAssignments(mergedAssignments);
 
     } catch (error: any) {
-      console.error('Error fetching assigned quizzes:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to load assigned quizzes',
-        variant: 'destructive',
-      });
+      console.error('An unexpected error occurred:', error);
+      setAssignments([]);
     } finally {
       setLoading(false);
     }
@@ -221,7 +265,7 @@ export function AssignedQuizzes({ onStartQuiz, onReviewQuiz }: AssignedQuizzesPr
             const daysUntilDue = assignment.due_date ? getDaysUntilDue(assignment.due_date) : null;
             
             return (
-              <Card key={assignment.id} className="hover:shadow-lg transition-shadow">
+              <Card key={assignment.assignment_id} className="hover:shadow-lg transition-shadow">
                 <CardHeader>
                   <div className="flex items-start justify-between">
                     <div className="flex-1">
@@ -291,7 +335,6 @@ export function AssignedQuizzes({ onStartQuiz, onReviewQuiz }: AssignedQuizzesPr
                         <div>
                           <p className="font-medium text-green-800">Completed!</p>                          <p className="text-sm text-green-600">
                             Score: {Math.round(assignment.completion.score)}% • 
-                            Questions: {assignment.completion.total_questions} • 
                             {formatDate(assignment.completion.completed_at)}
                           </p>
                         </div>
@@ -317,35 +360,36 @@ export function AssignedQuizzes({ onStartQuiz, onReviewQuiz }: AssignedQuizzesPr
                         <AlertDialogTrigger asChild>
                           <Button
                             className="bg-blue-600 hover:bg-blue-700"
-                            disabled={assignment.quiz.status === 'closed'}
+                            disabled={!assignment.quiz || !assignment.quiz.id || assignment.quiz.status === 'closed'}
                             onClick={() => {
-                              setQuizToStartId(assignment.quiz.id);
-                              setShowConfirmDialog(true);
+                              if (!assignment.quiz || !assignment.quiz.id) {
+                                console.error("Invalid quiz data for assignment:", assignment);
+                                toast({
+                                  title: "Error",
+                                  description: "Cannot start quiz due to invalid data.",
+                                  variant: "destructive",
+                                });
+                              }
                             }}
                           >
                             <PlayCircle className="h-4 w-4 mr-2" />
-                            Start Quiz
+                            Kerjakan Kuis
                           </Button>
                         </AlertDialogTrigger>
-                        {showConfirmDialog && quizToStartId === assignment.quiz.id && (
-                          <AlertDialogContent>
-                            <AlertDialogHeader>
-                              <AlertDialogTitle>Confirm Quiz Start</AlertDialogTitle>
-                              <AlertDialogDescription>
-                                Are you sure you want to take this quiz? Once you start, you have to finish it.
-                              </AlertDialogDescription>
-                            </AlertDialogHeader>
-                            <AlertDialogFooter>
-                              <AlertDialogCancel onClick={() => setShowConfirmDialog(false)}>Cancel</AlertDialogCancel>
-                              <AlertDialogAction onClick={() => {
-                                onStartQuiz(assignment.quiz.id);
-                                setShowConfirmDialog(false);
-                              }}>
-                                Start Quiz
-                              </AlertDialogAction>
-                            </AlertDialogFooter>
-                          </AlertDialogContent>
-                        )}
+                        <AlertDialogContent>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>Konfirmasi Mulai Kuis</AlertDialogTitle>
+                            <AlertDialogDescription>
+                              Apakah Anda yakin ingin mengerjakan kuis ini? Setelah dimulai, Anda harus menyelesaikannya.
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel>Batal</AlertDialogCancel>
+                            <AlertDialogAction onClick={() => onStartQuiz(assignment.quiz.id)}>
+                              Kerjakan Kuis
+                            </AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
                       </AlertDialog>
                     </div>
                   )}

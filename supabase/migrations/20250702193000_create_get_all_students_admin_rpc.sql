@@ -13,7 +13,7 @@ language plpgsql
 security definer set search_path = public
 as $$
 begin
-    if not is_admin() then
+    if not is_admin(auth.uid()) then
         raise exception 'You are not authorized to perform this action.';
     end if;
 

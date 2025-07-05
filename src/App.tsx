@@ -12,33 +12,19 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Routes, Route, Navigate, useNavigate } from 'react-router-dom'; // Import routing components
+import ForcePasswordChange from '@/pages/ForcePasswordChange';
 
 const queryClient = new QueryClient();
 
 function AppContent() {
   const { user, role, loading } = useAuth();
   const [loadingTimeout, setLoadingTimeout] = useState(false);
-  const navigate = useNavigate();
-
-  useEffect(() => {
-    if (role) {
-      if (role === 'admin') {
-        navigate('/admin');
-      } else if (role === 'teacher') {
-        navigate('/teacher');
-      } else if (role === 'student') {
-        navigate('/student');
-      }
-    }
-  }, [role, navigate]);
 
   useEffect(() => {
     if (loading) {
-      // Set timeout for loading state - reduced to 3 seconds
       const timer = setTimeout(() => {
         setLoadingTimeout(true);
-      }, 3000); // 3 seconds timeout instead of 10
-
+      }, 3000);
       return () => clearTimeout(timer);
     } else {
       setLoadingTimeout(false);
@@ -72,17 +58,35 @@ function AppContent() {
     );
   }
 
+  // If there's no user, they should see the login form.
   if (!user) {
-    return <AuthForm />;
+    return (
+      <Routes>
+        <Route path="/" element={<AuthForm />} />
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+    );
+  }
+  
+  // If the user needs to change their password, lock them into that page.
+  if (user.user_metadata?.requires_password_change) {
+    return (
+      <Routes>
+        <Route path="/force-password-change" element={<ForcePasswordChange />} />
+        <Route path="*" element={<Navigate to="/force-password-change" replace />} />
+      </Routes>
+    );
   }
 
+  // If user is logged in and password is fine, route them based on their role.
   return (
     <Routes>
-      <Route path="/admin/*" element={role === 'admin' ? <AdminPortal /> : <Navigate to="/" />} />
-      <Route path="/teacher/*" element={role === 'teacher' ? <TeacherPortal /> : <Navigate to="/" />} />
-      <Route path="/student/*" element={role === 'student' ? <StudentPortal /> : <Navigate to="/" />} />
-      <Route path="/" element={<AuthForm />} /> {/* Default route for login */}
-      <Route path="*" element={<Navigate to="/" />} /> {/* Catch-all for unknown routes */}
+      <Route path="/admin/*" element={role === 'admin' ? <AdminPortal /> : <Navigate to="/" replace />} />
+      <Route path="/teacher/*" element={role === 'teacher' ? <TeacherPortal /> : <Navigate to="/" replace />} />
+      <Route path="/student/*" element={role === 'student' ? <StudentPortal /> : <Navigate to="/" replace />} />
+      <Route path="/student/quiz/:quizId" element={role === 'student' ? <StudentPortal /> : <Navigate to="/" replace />} />
+      <Route path="/" element={role ? <Navigate to={`/${role}`} replace /> : <div className="min-h-screen flex items-center justify-center"><p>Loading...</p></div>} />
+      <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );
 }

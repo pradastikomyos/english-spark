@@ -52,12 +52,13 @@ const studentSchema = z.object({
 type StudentFormData = z.infer<typeof studentSchema>;
 
 // Define the type for a student based on your database schema
-interface Student {
+export interface Student {
   student_profile_id: string; // Renamed from id to match RPC response
   user_auth_id: string | null; // Can be null for students without auth users
   name: string;
   email: string;
   student_id: string;
+  class_id: string | null; // Add class_id to the Student interface
   created_at: string;
 }
 
@@ -71,28 +72,7 @@ interface StudentLegacy {
   created_at: string;
 }
 
-// Fetch function to get all students
-const fetchStudents = async (): Promise<Student[]> => {
-  try {
-    // Bypassing the faulty RPC and using a direct query instead.
-    const { data, error } = await supabase
-      .from('students')
-      .select('student_profile_id:id, user_auth_id:user_id, name, email, student_id, created_at')
-      .order('created_at', { ascending: false });
 
-    if (error) {
-      // If it's an RLS policy error, provide a more helpful message
-      if (error.message.includes('policy') || error.message.includes('recursion')) {
-        throw new Error('Database access configuration issue. Please contact administrator.');
-      }
-      throw new Error(error.message);
-    }
-
-    return data as unknown as Student[] || [];
-  } catch (err: any) {
-    throw new Error(err.message || 'Failed to fetch students');
-  }
-};
 
 // Function to call the create RPC
 const createStudent = async (studentData: StudentFormData) => {
@@ -134,7 +114,13 @@ const resetStudentPassword = async (email: string) => {
   return data;
 };
 
-export function StudentManagement() {
+interface StudentManagementProps {
+  students: Student[] | undefined;
+  isLoading: boolean;
+  error: Error | null;
+}
+
+export function StudentManagement({ students, isLoading, error }: StudentManagementProps) {
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [studentToEdit, setStudentToEdit] = useState<Student | null>(null);
   const [studentToDelete, setStudentToDelete] = useState<Student | null>(null);
@@ -174,10 +160,7 @@ export function StudentManagement() {
     }
   }, [studentToEdit, form]);
 
-  const { data: students, isLoading, error } = useQuery<Student[]>({ 
-    queryKey: ['students'], 
-    queryFn: fetchStudents 
-  });
+
 
   const createMutation = useMutation({
     mutationFn: createStudent,
@@ -266,9 +249,6 @@ export function StudentManagement() {
             setStudentToEdit(null);
           }
         }}>
-          <DialogTrigger asChild>
-            <Button onClick={() => setIsAddDialogOpen(true)}><PlusCircle className="mr-2 h-4 w-4" /> Add New Student</Button>
-          </DialogTrigger>
           <DialogContent className="sm:max-w-[425px]">
             <DialogHeader>
               <DialogTitle>{studentToEdit ? 'Edit Student' : 'Add New Student'}</DialogTitle>
@@ -357,20 +337,24 @@ export function StudentManagement() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Name</TableHead>
+                  <TableHead>Nama</TableHead>
+                  <TableHead>Username</TableHead>
                   <TableHead>Email</TableHead>
-                  <TableHead>Student ID</TableHead>
+                  <TableHead>Kelas</TableHead>
+                  <TableHead>Status</TableHead>
                   <TableHead>Password</TableHead>
                   <TableHead>Created At</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
+                  <TableHead className="text-right">Aksi</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {students.map((student) => (
                   <TableRow key={student.student_profile_id}>
                     <TableCell className="font-medium">{student.name}</TableCell>
+                    <TableCell>{student.email}</TableCell> {/* Using email as username for now */}
                     <TableCell>{student.email}</TableCell>
-                    <TableCell>{student.student_id}</TableCell>
+                    <TableCell>{classes.find(c => c.id === student.class_id)?.name || 'N/A'}</TableCell>
+                    <TableCell>Aktif</TableCell> {/* Placeholder for status */}
                     <TableCell className="font-mono">{tempPasswords[student.email] || '********'}</TableCell>
                     <TableCell>{new Date(student.created_at).toLocaleDateString()}</TableCell>
                     <TableCell className="text-right">

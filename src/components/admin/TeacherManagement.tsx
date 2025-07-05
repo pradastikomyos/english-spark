@@ -61,7 +61,7 @@ const teacherSchema = z.object({
 type TeacherFormData = z.infer<typeof teacherSchema>;
 
 // Type for a teacher from the database
-interface Teacher {
+export interface Teacher {
   id: string;
   user_id: string; // Important for delete operation
   name: string;
@@ -69,35 +69,7 @@ interface Teacher {
   created_at: string;
 }
 
-// Function to fetch teachers
-const fetchTeachers = async (): Promise<Teacher[]> => {
-  try {
-    // First try to use RPC call for admin access
-    const { data: rpcData, error: rpcError } = await supabase.rpc('get_all_teachers_admin');
-    
-    if (!rpcError && rpcData) {
-      return rpcData;
-    }
-    
-    // Fallback to direct table query
-    const { data, error } = await supabase
-      .from('teachers')
-      .select('id, user_id, name, email, created_at')
-      .order('created_at', { ascending: false });
-    
-    if (error) {
-      // If it's an RLS policy error, provide a more helpful message
-      if (error.message.includes('policy') || error.message.includes('recursion')) {
-        throw new Error('Database access configuration issue. Please contact administrator.');
-      }
-      throw new Error(error.message);
-    }
-    
-    return data || [];
-  } catch (err: any) {
-    throw new Error(err.message || 'Failed to fetch teachers');
-  }
-};
+
 
 // Function to call the create RPC
 const createTeacher = async (teacherData: TeacherFormData) => {
@@ -119,7 +91,13 @@ const updateTeacher = async (teacherData: TeacherFormData & { id: string }) => {
   if (error) throw new Error(error.message);
 };
 
-const TeacherManagement: React.FC = () => {
+interface TeacherManagementProps {
+  teachers: Teacher[] | undefined;
+  isLoading: boolean;
+  error: Error | null;
+}
+
+const TeacherManagement: React.FC<TeacherManagementProps> = ({ teachers, isLoading, error }) => {
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [teacherToEdit, setTeacherToEdit] = useState<Teacher | null>(null);
   const [teacherToDelete, setTeacherToDelete] = useState<Teacher | null>(null);
@@ -142,11 +120,6 @@ const TeacherManagement: React.FC = () => {
       form.reset({ name: '', email: '' });
     }
   }, [teacherToEdit, form]);
-
-  const { data: teachers, isLoading, error } = useQuery<Teacher[]>({
-    queryKey: ['teachers'],
-    queryFn: fetchTeachers,
-  });
 
   const createMutation = useMutation({
     mutationFn: createTeacher,
@@ -212,9 +185,6 @@ const TeacherManagement: React.FC = () => {
             setTeacherToEdit(null);
           }
         }}>
-          <DialogTrigger asChild>
-            <Button onClick={() => setIsAddDialogOpen(true)}><PlusCircle className="mr-2 h-4 w-4" /> Add New Teacher</Button>
-          </DialogTrigger>
           <DialogContent className="sm:max-w-[425px]">
             <DialogHeader>
               <DialogTitle>{teacherToEdit ? 'Edit Teacher' : 'Add New Teacher'}</DialogTitle>
@@ -264,18 +234,23 @@ const TeacherManagement: React.FC = () => {
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Name</TableHead>
+              <TableHead>Nama</TableHead>
+              <TableHead>Username</TableHead>
               <TableHead>Email</TableHead>
+              <TableHead>Kelas</TableHead>
+              <TableHead>Status</TableHead>
               <TableHead>Joined On</TableHead>
-              <TableHead><span className="sr-only">Actions</span></TableHead>
+              <TableHead><span className="sr-only">Aksi</span></TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {teachers && teachers.length > 0 ? (
               teachers.map((teacher) => (
-                <TableRow key={teacher.id}>
-                  <TableCell className="font-medium">{teacher.name}</TableCell>
+                <TableRow key={teacher.id}><TableCell className="font-medium">{teacher.name}</TableCell>
+                  <TableCell>{teacher.email}</TableCell> {/* Using email as username for now */}
                   <TableCell>{teacher.email}</TableCell>
+                  <TableCell>N/A</TableCell> {/* Teachers don't have a direct class association */}
+                  <TableCell>Aktif</TableCell> {/* Placeholder for status */}
                   <TableCell>{new Date(teacher.created_at).toLocaleDateString()}</TableCell>
                   <TableCell>
                     <DropdownMenu>

@@ -9,6 +9,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/lib/supabase';
 import { Send, Users, Clock, Award, Target, CheckCircle, AlertCircle, XCircle, Trash2 } from 'lucide-react';
+import { QuizFileUploadDialog } from './QuizFileUploadDialog';
 
 interface Quiz {
   id: string;
