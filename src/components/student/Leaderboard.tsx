@@ -151,11 +151,18 @@ export function Leaderboard() {
 
         if (studentsError) throw studentsError;
 
+        console.log('Fetched students data:', studentsData);
+        console.log('Students data length:', studentsData?.length);
+
         const rankedStudents: LeaderboardStudent[] = (studentsData || []).map((student: any, index) => ({
           ...student,
           rank: index + 1,
           isCurrentUser: student.id === profileId,
         }));
+        
+        console.log('Ranked students:', rankedStudents);
+        console.log('Setting leaderboard data with length:', rankedStudents.length);
+        
         setLeaderboardData(rankedStudents);
 
         const totalStudents = rankedStudents.length;
@@ -363,13 +370,16 @@ export function Leaderboard() {
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
+              {console.log('About to render leaderboard. Length:', leaderboardData.length, 'Data:', leaderboardData)}
               {leaderboardData.length === 0 ? (
                 <div className="text-center py-8 text-gray-500">
                   <Trophy className="h-12 w-12 mx-auto mb-4 text-gray-300" />
                   <p>No students found in the leaderboard.</p>
                 </div>
               ) : (
-                leaderboardData.map((student) => (
+                leaderboardData.map((student, index) => {
+                  console.log(`Rendering student ${index}:`, student);
+                  return (
                   <div
                     key={student.id}
                     className={`p-4 rounded-lg border transition-all ${
@@ -438,7 +448,8 @@ export function Leaderboard() {
                       </div>
                     </div>
                   </div>
-                ))
+                  );
+                })
               )}
             </div>
           </CardContent>

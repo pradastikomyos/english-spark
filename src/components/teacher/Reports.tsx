@@ -39,9 +39,23 @@ const Reports: React.FC = () => {
   const fetchReportsData = async () => {
     setLoading(true);
     try {
+      // Get current user ID (not teacher record ID)
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user?.id) throw new Error('User not authenticated');
+
+      // Get teacher record ID from user_id
+      const { data: teacherData, error: teacherError } = await supabase
+        .from('teachers')
+        .select('id')
+        .eq('user_id', user.id)
+        .single();
+
+      if (teacherError) throw teacherError;
+      if (!teacherData) throw new Error('Teacher record not found');
+
       const [scoresRes, leaderboardRes] = await Promise.all([
-        supabase.rpc('get_student_scores_for_teacher', { p_teacher_id: profileId }),
-        supabase.rpc('get_leaderboard_for_teacher', { p_teacher_id: profileId })
+        supabase.rpc('get_student_scores_for_teacher', { p_teacher_id: teacherData.id }),
+        supabase.rpc('get_leaderboard_for_teacher', { p_teacher_id: teacherData.id })
       ]);
 
       if (scoresRes.error) throw scoresRes.error;

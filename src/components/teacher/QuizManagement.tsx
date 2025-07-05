@@ -168,38 +168,26 @@ export default function QuizManagement() {
     try {
       const { title, description, time_limit } = quizForm;
       
-      // Get teacher ID from teachers table
-      const { data: teacherData, error: teacherError } = await supabase
-        .from('teachers')
-        .select('id')
-        .eq('user_id', profileId)
-        .single();
-
-      if (teacherError) throw teacherError;
-      if (!teacherData) throw new Error('Teacher record not found');
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user?.id) throw new Error('User not authenticated');
 
       const { data, error } = await supabase
-        .from('quizzes')
-        .insert([
-          {
-            title,
-            description,
-            time_limit,
-            points_per_question: 0,
-            created_by: teacherData.id, // Use teacher.id for created_by
-            // teacher_id will be set automatically by trigger
-          },
-        ])
-        .select()
-        .single();
+        .rpc('create_quiz_for_teacher', {
+          p_title: title,
+          p_description: description,
+          p_time_limit: time_limit,
+          p_teacher_user_id: user.id
+        });
 
       if (error) throw error;
+      if (!data || data.length === 0) throw new Error('Failed to create quiz');
 
-      toast({ title: 'Success', description: `Quiz "${data.title}" created.` });
+      toast({ title: 'Success', description: `Quiz "${title}" created.` });
       setIsCreateDialogOpen(false);
       resetForm();
       fetchQuizzes();
     } catch (error: any) {
+      console.error('Create quiz error:', error);
       toast({ title: 'Creation Failed', description: error.message, variant: 'destructive' });
     }
   };
