@@ -215,18 +215,32 @@ export default function QuizManagement() {
   };
 
   const handleDeleteQuiz = async () => {
-    if (!quizToDelete) return;
+    if (!quizToDelete || !profileId) { // profileId check is still good for general user validity
+      toast({ title: 'Error', description: 'Cannot delete quiz without a valid user.', variant: 'destructive' });
+      return;
+    }
     try {
-      // Cascade delete ditangani oleh constraint foreign key di database
-      const { error } = await supabase.from('quizzes').delete().eq('id', quizToDelete.id);
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user?.id) throw new Error('User not authenticated');
+
+      const { error } = await supabase.rpc('delete_quiz_for_teacher', {
+        p_quiz_id: quizToDelete.id,
+        p_teacher_id: user.id, // Use user.id (auth.uid()) which matches quizzes.teacher_id
+      });
+
       if (error) throw error;
 
       toast({ title: 'Success', description: `Quiz "${quizToDelete.title}" deleted.` });
+      
+      // Optimistic UI update
+      setQuizzes(prevQuizzes => prevQuizzes.filter(q => q.id !== quizToDelete.id));
+
+    } catch (error: any) {
+      console.error("Deletion failed:", error);
+      toast({ title: 'Deletion Failed', description: error.message, variant: 'destructive' });
+    } finally {
       setIsDeleteConfirmOpen(false);
       setQuizToDelete(null);
-      fetchQuizzes();
-    } catch (error: any) {
-      toast({ title: 'Deletion Failed', description: error.message, variant: 'destructive' });
     }
   };
 
