@@ -171,24 +171,44 @@ export default function QuizManagement() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user?.id) throw new Error('User not authenticated');
 
+      // Create quiz directly with teacher_id as auth.uid()
       const { data, error } = await supabase
-        .rpc('create_quiz_for_teacher', {
-          p_title: title,
-          p_description: description,
-          p_time_limit: time_limit,
-          p_teacher_user_id: user.id
-        });
+        .from('quizzes')
+        .insert({
+          title,
+          description,
+          time_limit,
+          teacher_id: user.id, // Use auth.uid() as teacher_id
+          created_by: user.id, // For backward compatibility
+          status: 'open'
+        })
+        .select()
+        .single();
 
-      if (error) throw error;
-      if (!data || data.length === 0) throw new Error('Failed to create quiz');
+      if (error) {
+        console.error('Create error:', error);
+        throw error;
+      }
 
-      toast({ title: 'Success', description: `Quiz "${title}" created.` });
+      if (!data) {
+        throw new Error('Failed to create quiz - no data returned');
+      }
+
+      toast({ 
+        title: 'Success', 
+        description: `Quiz "${title}" created successfully!` 
+      });
+      
       setIsCreateDialogOpen(false);
       resetForm();
       fetchQuizzes();
     } catch (error: any) {
       console.error('Create quiz error:', error);
-      toast({ title: 'Creation Failed', description: error.message, variant: 'destructive' });
+      toast({ 
+        title: 'Creation Failed', 
+        description: error.message || 'Failed to create quiz', 
+        variant: 'destructive' 
+      });
     }
   };
 
@@ -197,47 +217,89 @@ export default function QuizManagement() {
     if (!currentQuiz) return;
     try {
       const { title, description, time_limit } = quizForm;
+      
+      // Get current user to ensure we're the teacher
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user?.id) throw new Error('User not authenticated');
+
+      // Update quiz directly with proper RLS
       const { data, error } = await supabase
         .from('quizzes')
-        .update({ title, description, time_limit })
+        .update({ 
+          title, 
+          description, 
+          time_limit,
+          updated_at: new Date().toISOString()
+        })
         .eq('id', currentQuiz.id)
+        .eq('teacher_id', user.id) // Extra security check
         .select()
         .single();
 
-      if (error) throw error;
+      if (error) {
+        console.error('Update error:', error);
+        throw error;
+      }
 
-      toast({ title: 'Success', description: `Quiz "${data.title}" updated.` });
+      if (!data) {
+        throw new Error('No data returned from update - quiz not found or access denied');
+      }
+
+      toast({ 
+        title: 'Success', 
+        description: `Quiz "${data.title}" updated successfully!` 
+      });
+      
       setIsEditDialogOpen(false);
+      setCurrentQuiz(null);
+      resetForm();
       fetchQuizzes();
     } catch (error: any) {
-      toast({ title: 'Update Failed', description: error.message, variant: 'destructive' });
+      console.error('Quiz update failed:', error);
+      toast({ 
+        title: 'Update Failed', 
+        description: error.message || 'Failed to update quiz', 
+        variant: 'destructive' 
+      });
     }
   };
 
   const handleDeleteQuiz = async () => {
-    if (!quizToDelete || !profileId) { // profileId check is still good for general user validity
-      toast({ title: 'Error', description: 'Cannot delete quiz without a valid user.', variant: 'destructive' });
+    if (!quizToDelete) {
+      toast({ title: 'Error', description: 'No quiz selected for deletion.', variant: 'destructive' });
       return;
     }
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user?.id) throw new Error('User not authenticated');
 
-      const { error } = await supabase.rpc('delete_quiz_for_teacher', {
-        p_quiz_id: quizToDelete.id,
-        p_teacher_id: user.id, // Use user.id (auth.uid()) which matches quizzes.teacher_id
+      // Delete quiz directly with proper RLS
+      const { error } = await supabase
+        .from('quizzes')
+        .delete()
+        .eq('id', quizToDelete.id)
+        .eq('teacher_id', user.id); // Extra security check
+
+      if (error) {
+        console.error('Delete error:', error);
+        throw error;
+      }
+
+      toast({ 
+        title: 'Success', 
+        description: `Quiz "${quizToDelete.title}" deleted successfully!` 
       });
-
-      if (error) throw error;
-
-      toast({ title: 'Success', description: `Quiz "${quizToDelete.title}" deleted.` });
       
       // Optimistic UI update
       setQuizzes(prevQuizzes => prevQuizzes.filter(q => q.id !== quizToDelete.id));
 
     } catch (error: any) {
       console.error("Deletion failed:", error);
-      toast({ title: 'Deletion Failed', description: error.message, variant: 'destructive' });
+      toast({ 
+        title: 'Deletion Failed', 
+        description: error.message || 'Failed to delete quiz', 
+        variant: 'destructive' 
+      });
     } finally {
       setIsDeleteConfirmOpen(false);
       setQuizToDelete(null);
