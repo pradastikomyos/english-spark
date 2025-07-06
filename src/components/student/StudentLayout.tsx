@@ -52,7 +52,10 @@ export function StudentLayout({ children, currentPage, onPageChange, sidebarOpen
             </Button>
             <div className="flex-1"></div>
             <div className="flex items-center gap-4">
-              <TourControl variant="icon" />
+              <TourControl 
+                variant="icon" 
+                onNavigateToDashboard={() => onPageChange('dashboard')}
+              />
               <ThemeToggle />
             </div>
           </div>

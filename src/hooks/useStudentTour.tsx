@@ -5,95 +5,145 @@ import 'intro.js/introjs.css';
 
 // Custom CSS for intro.js styling
 const addTourStyles = () => {
-  if (!document.getElementById('tour-styles')) {
-    const style = document.createElement('style');
-    style.id = 'tour-styles';
-    style.textContent = `
-      .introjs-tooltip {
-        font-family: system-ui, -apple-system, sans-serif;
-        border-radius: 12px;
-        box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
-        border: 1px solid #e5e7eb;
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        color: white;
-        max-width: 400px;
-      }
-      
-      .introjs-tooltiptext {
-        font-size: 16px;
-        line-height: 1.5;
-        padding: 8px 0;
-      }
-      
-      .introjs-tooltip-header {
-        padding: 16px 20px 8px;
-        border-bottom: 1px solid rgba(255, 255, 255, 0.2);
-      }
-      
-      .introjs-tooltip-title {
-        font-size: 18px;
-        font-weight: 600;
-        margin: 0;
-        color: white;
-      }
-      
-      .introjs-tooltipbuttons {
-        padding: 16px 20px;
-        background: rgba(255, 255, 255, 0.1);
-        border-radius: 0 0 12px 12px;
-      }
-      
-      .introjs-button {
-        border-radius: 8px;
-        font-weight: 500;
-        padding: 8px 16px;
-        transition: all 0.2s;
-      }
-      
-      .introjs-nextbutton {
-        background: #10b981 !important;
-        border: none !important;
-        color: white !important;
-      }
-      
-      .introjs-nextbutton:hover {
-        background: #059669 !important;
-        transform: translateY(-1px);
-      }
-      
-      .introjs-prevbutton {
-        background: transparent !important;
-        border: 1px solid rgba(255, 255, 255, 0.3) !important;
-        color: white !important;
-      }
-      
-      .introjs-skipbutton {
-        background: transparent !important;
-        border: 1px solid rgba(255, 255, 255, 0.3) !important;
-        color: white !important;
-      }
-      
-      .introjs-overlay {
-        background: rgba(0, 0, 0, 0.6) !important;
-      }
-      
-      .introjs-helperLayer {
-        border-radius: 8px;
-        box-shadow: 0 0 0 4px rgba(102, 126, 234, 0.3);
-      }
-      
-      .introjs-tooltipReferenceLayer {
-        border-radius: 8px;
-      }
-      
-      .tour-emoji {
-        font-size: 24px;
-        margin-right: 8px;
-        display: inline-block;
-      }
-    `;
-    document.head.appendChild(style);
-  }
+  if (document.getElementById('tour-styles')) return;
+
+  const style = document.createElement('style');
+  style.id = 'tour-styles';
+  style.textContent = `
+    /* --- TOTAL MAKEOVER --- */
+    .introjs-tooltip {
+      font-family: 'Poppins', 'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif !important;
+      border-radius: 12px !important;
+      background-color: #FFFFFF !important;
+      color: #2D3748 !important; /* Dark Gray */
+      box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04) !important;
+      border: 1px solid #E2E8F0 !important; /* Light Gray Border */
+      max-width: 380px !important;
+      min-width: 340px !important;
+      padding: 0 !important;
+      overflow: hidden !important;
+      z-index: 99999999 !important;
+    }
+
+    .introjs-tooltip-header {
+      display: flex !important;
+      justify-content: space-between !important;
+      align-items: center !important;
+      padding: 16px 20px !important;
+      background-color: #F7FAFC !important; /* Lighter Gray Background */
+      border-bottom: 1px solid #E2E8F0 !important;
+    }
+
+    .introjs-tooltip-title {
+      font-size: 18px !important;
+      font-weight: 600 !important;
+      margin: 0 !important;
+      color: #1A202C !important; /* Almost Black */
+    }
+
+    .introjs-skipbutton {
+      font-size: 13px !important;
+      font-weight: 500 !important;
+      color: #718096 !important; /* Medium Gray */
+      background: transparent !important;
+      border: none !important;
+      padding: 4px 8px !important;
+      border-radius: 6px !important;
+      transition: background-color 0.2s ease, color 0.2s ease !important;
+    }
+
+    .introjs-skipbutton:hover {
+      background-color: #EDF2F7 !important; /* Light Gray Hover */
+      color: #2D3748 !important;
+    }
+
+    .introjs-tooltiptext {
+      padding: 20px !important;
+      font-size: 15px !important;
+      line-height: 1.7 !important;
+      color: #4A5568 !important; /* Darker Medium Gray */
+      font-weight: 400 !important;
+    }
+
+    .introjs-progress {
+      background-color: #E2E8F0 !important;
+      height: 4px !important;
+      border-radius: 0 !important;
+      margin: 0 !important;
+    }
+
+    .introjs-progressbar {
+      background-color: #48BB78 !important; /* Green */
+    }
+
+    .introjs-tooltipbuttons {
+      display: flex !important;
+      justify-content: flex-end !important;
+      align-items: center !important;
+      padding: 12px 20px !important;
+      border-top: 1px solid #E2E8F0 !important;
+      background-color: #F7FAFC !important;
+      gap: 8px !important;
+    }
+
+    .introjs-button {
+      text-decoration: none !important;
+      font-weight: 600 !important;
+      border-radius: 8px !important;
+      padding: 9px 18px !important;
+      transition: all 0.25s ease !important;
+      border: 1px solid transparent !important;
+      cursor: pointer !important;
+      font-size: 14px !important;
+      text-shadow: none !important;
+    }
+
+    .introjs-prevbutton {
+      background-color: #FFFFFF !important;
+      color: #4A5568 !important;
+      border-color: #CBD5E0 !important; /* Gray Border */
+    }
+
+    .introjs-prevbutton:hover {
+      background-color: #F7FAFC !important;
+      border-color: #A0AEC0 !important;
+    }
+
+    .introjs-nextbutton, .introjs-donebutton {
+      background-color: #4299E1 !important; /* Blue */
+      color: white !important;
+      border-color: #4299E1 !important;
+    }
+
+    .introjs-nextbutton:hover, .introjs-donebutton:hover {
+      background-color: #3182CE !important; /* Darker Blue */
+      box-shadow: 0 4px 12px -2px rgba(66, 153, 225, 0.4) !important;
+      transform: translateY(-1px) !important;
+    }
+
+    .introjs-disabled, .introjs-disabled:hover {
+      background-color: #CBD5E0 !important;
+      color: #A0AEC0 !important;
+      cursor: not-allowed !important;
+      transform: none !important;
+      box-shadow: none !important;
+      border-color: transparent !important;
+    }
+
+    .introjs-arrow.top, .introjs-arrow.top-middle, .introjs-arrow.top-right {
+      border-bottom-color: #FFFFFF !important;
+    }
+    .introjs-arrow.bottom, .introjs-arrow.bottom-middle, .introjs-arrow.bottom-right {
+      border-top-color: #FFFFFF !important;
+    }
+    .introjs-arrow.left {
+      border-right-color: #FFFFFF !important;
+    }
+    .introjs-arrow.right {
+      border-left-color: #FFFFFF !important;
+    }
+  `;
+  document.head.appendChild(style);
 };
 
 interface TourStep {
@@ -181,20 +231,32 @@ const studentTourSteps: TourStep[] = [
 export const useStudentTour = () => {
   const { user, role } = useAuth();
 
+  console.log('🎯 useStudentTour hook initialized', { user: user?.id, role });
+
   // Check if user is a student and hasn't seen the tour
   const checkUserRole = useCallback(() => {
-    return role === 'student';
+    const isStudent = role === 'student';
+    console.log('👤 Check user role:', { role, isStudent });
+    return isStudent;
   }, [role]);
 
   // Check if it's student's first time or tour not completed
   const isFirstTimeStudent = useCallback(() => {
     const tourCompleted = localStorage.getItem('studentTourCompleted');
     const userSpecificTour = localStorage.getItem(`studentTour_${user?.id}`);
-    return !tourCompleted && !userSpecificTour;
+    const isFirstTime = !tourCompleted && !userSpecificTour;
+    console.log('🔍 Check first time student:', { 
+      tourCompleted, 
+      userSpecificTour, 
+      isFirstTime,
+      userId: user?.id 
+    });
+    return isFirstTime;
   }, [user?.id]);
 
   // Store tour completion
   const markTourCompleted = useCallback(() => {
+    console.log('✅ Marking tour as completed');
     localStorage.setItem('studentTourCompleted', 'true');
     if (user?.id) {
       localStorage.setItem(`studentTour_${user.id}`, 'true');
@@ -225,7 +287,7 @@ export const useStudentTour = () => {
               <div class="introjs-tooltip-header">
                 <h3 class="introjs-tooltip-title">${step.title || ''}</h3>
               </div>
-              <div style="padding: 16px 20px;">
+              <div class="introjs-tooltip-content">
                 ${step.intro}
               </div>
             `,
@@ -236,10 +298,10 @@ export const useStudentTour = () => {
           exitOnEsc: true,
           exitOnOverlayClick: false,
           disableInteraction: false,
-          nextLabel: 'Lanjut →',
-          prevLabel: '← Kembali',
-          skipLabel: 'Skip Tour',
-          doneLabel: 'Selesai! 🎉'
+          nextLabel: '<strong>Lanjut →</strong>',
+          prevLabel: '<strong>← Kembali</strong>',
+          skipLabel: '<strong>Skip Tour</strong>',
+          doneLabel: '<strong>Selesai! 🎉</strong>'
         });
 
         // Event handlers
@@ -252,6 +314,28 @@ export const useStudentTour = () => {
               inline: 'center'
             });
           }
+
+          // Custom button reordering logic
+          const buttonArea = document.querySelector('.introjs-tooltipbuttons');
+          if (buttonArea) {
+            const prevBtn = buttonArea.querySelector('.introjs-prevbutton');
+            const nextBtn = buttonArea.querySelector('.introjs-nextbutton');
+            const doneBtn = buttonArea.querySelector('.introjs-donebutton');
+
+            // Ensure the right-side container exists
+            if (!buttonArea.querySelector('.introjs-buttons-right')) {
+              const rightContainer = document.createElement('div');
+              rightContainer.className = 'introjs-buttons-right';
+              
+              // Move buttons into the right container
+              if (prevBtn) rightContainer.appendChild(prevBtn);
+              if (nextBtn) rightContainer.appendChild(nextBtn);
+              if (doneBtn) rightContainer.appendChild(doneBtn);
+
+              buttonArea.appendChild(rightContainer);
+            }
+          }
+          return true; // Allow the step to proceed
         });
 
         intro.oncomplete(function() {
@@ -288,15 +372,142 @@ export const useStudentTour = () => {
 
   // Function to manually start tour (for testing or re-showing)
   const restartTour = useCallback(() => {
-    startTour();
-  }, [startTour]);
+    console.log('🎯 Manual tour restart triggered');
+    console.log('Current user role:', role);
+    console.log('User ID:', user?.id);
+    
+    // Check if we're on the right page for tour
+    const currentPath = window.location.pathname;
+    const isOnStudentPortal = currentPath.includes('/student');
+    
+    console.log('Current path:', currentPath);
+    console.log('Is on student portal:', isOnStudentPortal);
+    
+    if (!isOnStudentPortal) {
+      alert('Tour hanya bisa dimulai dari Student Portal. Redirecting...');
+      window.location.href = '/student';
+      return;
+    }
+    
+    // Force start tour regardless of completion status
+    addTourStyles();
+    
+    const intro = introJs();
+    
+    // Check if we're on dashboard page and elements exist
+    const checkElements = () => {
+      // Check if we need to navigate to dashboard first
+      const isDashboardActive = document.querySelector('[data-tour="total-points"]') !== null;
+      
+      if (!isDashboardActive) {
+        console.log('📍 Not on dashboard, trying to navigate...');
+        
+        // Try to find and click dashboard navigation
+        const dashboardButton = document.querySelector('button[aria-label="Dashboard"], button:contains("Dashboard"), [data-testid="dashboard-nav"]');
+        if (dashboardButton) {
+          console.log('🔄 Clicking dashboard navigation...');
+          (dashboardButton as HTMLElement).click();
+          setTimeout(checkElements, 1000);
+          return;
+        }
+        
+        // If no navigation found, show message
+        alert('Untuk memulai tour, silakan klik menu "Dashboard" terlebih dahulu, lalu coba lagi.');
+        return;
+      }
+      
+      const requiredElements = [
+        '[data-tour="total-points"]',
+        '[data-tour="current-level"]', 
+        '[data-tour="streak-days"]',
+        '[data-tour="class-rank"]'
+      ];
+      
+      const elementsFound = requiredElements.map(selector => {
+        const element = document.querySelector(selector);
+        console.log(`Element ${selector}:`, element ? 'Found ✅' : 'Missing ❌');
+        return element;
+      });
+      
+      const hasBasicElements = elementsFound.filter(Boolean).length >= 2;
+      
+      if (hasBasicElements) {
+        console.log('✅ Starting tour with available elements');
+        
+        // Filter steps to only include existing elements
+        const availableSteps = studentTourSteps.filter(step => {
+          if (step.element === 'body') return true;
+          return document.querySelector(step.element) !== null;
+        });
+        
+        console.log(`Found ${availableSteps.length} available tour steps`);
+        
+        intro.setOptions({
+          steps: availableSteps.map(step => ({
+            element: step.element,
+            intro: `
+              <div class="introjs-tooltip-header">
+                <h3 class="introjs-tooltip-title">${step.title || ''}</h3>
+              </div>
+              <div class="introjs-tooltip-content">
+                ${step.intro}
+              </div>
+            `,
+            position: step.position || 'bottom'
+          })),
+          showProgress: true,
+          showBullets: false,
+          exitOnEsc: true,
+          exitOnOverlayClick: false,
+          disableInteraction: false,
+          nextLabel: 'Lanjut →',
+          prevLabel: '← Kembali', 
+          skipLabel: 'Skip Tour',
+          doneLabel: 'Selesai! 🎉'
+        });
+
+        intro.onbeforechange(function(targetElement) {
+          if (targetElement && targetElement !== document.body) {
+            targetElement.scrollIntoView({ 
+              behavior: 'smooth', 
+              block: 'center',
+              inline: 'center'
+            });
+          }
+          return true;
+        });
+
+        intro.oncomplete(function() {
+          console.log('Tour completed');
+        });
+
+        intro.onexit(function() {
+          console.log('Tour exited');
+        });
+
+        try {
+          intro.start();
+          console.log('✅ Tour started successfully');
+        } catch (error) {
+          console.error('❌ Error starting tour:', error);
+        }
+      } else {
+        console.log('❌ Not enough elements found, retrying...');
+        setTimeout(checkElements, 500);
+      }
+    };
+
+    setTimeout(checkElements, 100);
+  }, [role, user?.id]);
 
   // Function to reset tour status (for testing)
   const resetTourStatus = useCallback(() => {
+    console.log('🔄 Resetting tour status');
     localStorage.removeItem('studentTourCompleted');
     if (user?.id) {
       localStorage.removeItem(`studentTour_${user.id}`);
     }
+    console.log('✅ Tour status reset complete');
   }, [user?.id]);
 
   return {

@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/lib/supabase';
+import { SimpleTourControl } from './SimpleTourControl';
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -19,7 +20,11 @@ interface ProfileData {
   created_at: string;
 }
 
-const Profile = () => {
+interface ProfileProps {
+  onNavigateToDashboard?: () => void;
+}
+
+const Profile = ({ onNavigateToDashboard }: ProfileProps) => {
   const { user, profileId, signOut } = useAuth();
   const { toast } = useToast();
   const [profile, setProfile] = useState<ProfileData | null>(null);
@@ -251,6 +256,23 @@ const Profile = () => {
                   <StatItem icon={BarChart2} label="Level" value={profile.level} />
                   <StatItem icon={Star} label="Total Points" value={profile.total_points} />
                   <StatItem icon={Award} label="Streak" value={`${profile.current_streak} days`} />
+                </div>
+              </div>
+
+              <div>
+                <h3 className="font-semibold text-lg mb-4">Dashboard Tour</h3>
+                <div className="p-4 bg-gradient-to-r from-purple-50 to-blue-50 dark:from-purple-900/20 dark:to-blue-900/20 rounded-lg border border-purple-200 dark:border-purple-800">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="font-medium text-purple-900 dark:text-purple-100">
+                        🎓 Panduan Dashboard
+                      </p>
+                      <p className="text-sm text-purple-700 dark:text-purple-300 mt-1">
+                        Pelajari cara menggunakan semua fitur dashboard English Spark
+                      </p>
+                    </div>
+                    <SimpleTourControl onNavigateToDashboard={onNavigateToDashboard} />
+                  </div>
                 </div>
               </div>
             </>

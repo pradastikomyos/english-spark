@@ -148,7 +148,7 @@ export default function StudentPortal() {
       case 'achievements':
         return <Achievements />;
       case 'profile':
-        return <Profile />;
+        return <Profile onNavigateToDashboard={() => setCurrentPage('dashboard')} />;
       default:
         return <StudentDashboard onStartQuiz={handleStartQuiz} onReviewQuiz={handleReviewQuiz} />;
     }

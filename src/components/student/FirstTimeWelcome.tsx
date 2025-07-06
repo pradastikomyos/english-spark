@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { useStudentTour } from '@/hooks/useStudentTour';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { X, BookOpen, PlayCircle } from 'lucide-react';
 
@@ -45,64 +44,57 @@ export const FirstTimeWelcome: React.FC = () => {
   }
 
   return (
-    <div className="fixed top-4 right-4 z-50 max-w-md">
-      <Card className="shadow-lg border-l-4 border-l-purple-500 bg-gradient-to-br from-purple-50 to-blue-50">
-        <CardHeader className="pb-3">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-purple-100 rounded-full flex items-center justify-center">
-                <BookOpen className="h-5 w-5 text-purple-600" />
-              </div>
+    <div className="mb-6">
+      <Alert className="border-2 border-purple-200 bg-gradient-to-r from-purple-50 to-indigo-50 dark:from-purple-900/20 dark:to-indigo-900/20 shadow-lg">
+        <div className="flex items-start gap-4">
+          <div className="bg-purple-100 dark:bg-purple-900/50 p-3 rounded-lg">
+            <BookOpen className="h-6 w-6 text-purple-600 dark:text-purple-400" />
+          </div>
+          <div className="flex-1">
+            <div className="flex items-start justify-between">
               <div>
-                <CardTitle className="text-lg text-purple-800">
-                  Selamat datang! 🎉
-                </CardTitle>
-                <CardDescription className="text-purple-600">
-                  Pertama kali di English Spark?
-                </CardDescription>
+                <h4 className="font-bold text-lg text-purple-900 dark:text-purple-100 mb-2">
+                  🎉 Selamat datang! Pertama kali di English Spark?
+                </h4>
+                <AlertDescription className="text-purple-700 dark:text-purple-200 mb-4 leading-relaxed">
+                  Yuk, kenalan dulu dengan semua fitur dashboard kamu! 
+                  Tour interaktif ini akan memandu kamu memahami cara 
+                  menggunakan English Spark dengan maksimal.
+                </AlertDescription>
+                <div className="flex gap-3">
+                  <Button 
+                    onClick={handleStartTour}
+                    className="bg-purple-600 hover:bg-purple-700 text-white font-medium shadow-md hover:shadow-lg transition-all"
+                    size="sm"
+                  >
+                    <PlayCircle className="h-4 w-4 mr-2" />
+                    Mulai Tour
+                  </Button>
+                  <Button 
+                    variant="outline" 
+                    onClick={handleDismiss}
+                    size="sm"
+                    className="border-purple-300 text-purple-700 hover:bg-purple-50 dark:border-purple-600 dark:text-purple-300 dark:hover:bg-purple-900/50"
+                  >
+                    Nanti aja
+                  </Button>
+                </div>
+                <p className="text-xs text-purple-600 dark:text-purple-400 mt-3 flex items-center">
+                  💡 Kamu bisa mengulang tour kapan saja dari ikon bantuan di pojok kanan atas
+                </p>
               </div>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleDismiss}
+                className="text-purple-400 hover:text-purple-600 hover:bg-purple-100 dark:hover:bg-purple-900/50 -mt-1 -mr-2"
+              >
+                <X className="h-4 w-4" />
+              </Button>
             </div>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={handleDismiss}
-              className="text-purple-500 hover:text-purple-700 hover:bg-purple-100"
-            >
-              <X className="h-4 w-4" />
-            </Button>
           </div>
-        </CardHeader>
-        <CardContent className="pt-0">
-          <Alert className="border-purple-200 bg-white/60">
-            <AlertDescription className="text-purple-700">
-              Yuk, kenalan dulu dengan semua fitur dashboard kamu! 
-              Tour interaktif ini akan memandu kamu memahami cara 
-              menggunakan English Spark dengan maksimal.
-            </AlertDescription>
-          </Alert>
-          
-          <div className="flex gap-2 mt-4">
-            <Button 
-              onClick={handleStartTour}
-              className="flex-1 bg-purple-600 hover:bg-purple-700 text-white"
-            >
-              <PlayCircle className="h-4 w-4 mr-2" />
-              Mulai Tour
-            </Button>
-            <Button 
-              variant="outline" 
-              onClick={handleDismiss}
-              className="px-4 border-purple-300 text-purple-600 hover:bg-purple-50"
-            >
-              Nanti aja
-            </Button>
-          </div>
-          
-          <p className="text-xs text-purple-500 mt-2 text-center">
-            💡 Kamu bisa mengulang tour kapan saja dari menu di pojok kanan atas
-          </p>
-        </CardContent>
-      </Card>
+        </div>
+      </Alert>
     </div>
   );
 };
