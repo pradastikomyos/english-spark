@@ -9,6 +9,7 @@ import { StudyMaterials } from '@/components/student/StudyMaterials';
 import { MaterialViewer } from '@/components/student/MaterialViewer';
 import { Achievements } from '@/components/student/Achievements';
 import Profile from '@/components/student/Profile';
+import { FirstTimeWelcome } from '@/components/student/FirstTimeWelcome';
 import { useToast } from '@/hooks/use-toast';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { QuizReview } from '@/components/student/QuizReview';
@@ -168,14 +169,17 @@ export default function StudentPortal() {
   }
 
   return (
-    <StudentLayout
-      currentPage={currentPage}
-      onPageChange={setCurrentPage}
-      sidebarOpen={sidebarOpen}
-      setSidebarOpen={setSidebarOpen}
-      isTakingQuiz={takingQuiz}
-    >
-      {renderPage()}
-    </StudentLayout>
+    <>
+      <StudentLayout
+        currentPage={currentPage}
+        onPageChange={setCurrentPage}
+        sidebarOpen={sidebarOpen}
+        setSidebarOpen={setSidebarOpen}
+        isTakingQuiz={takingQuiz}
+      >
+        {renderPage()}
+      </StudentLayout>
+      <FirstTimeWelcome />
+    </>
   );
 }

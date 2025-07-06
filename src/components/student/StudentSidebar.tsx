@@ -48,6 +48,19 @@ const StudentSidebar: React.FC<StudentSidebarProps> = ({ activeTab, setActiveTab
           {navigation.map((item) => {
             const Icon = item.icon;
             const isActive = activeTab === item.id;
+            
+            // Add data-tour attributes for specific items
+            const getTourAttribute = (id: string) => {
+              const tourMap: Record<string, string> = {
+                'results': 'sidebar-results',
+                'leaderboard': 'sidebar-leaderboard', 
+                'materials': 'sidebar-materials',
+                'achievements': 'sidebar-achievements',
+                'profile': 'sidebar-profile'
+              };
+              return tourMap[id] ? { 'data-tour': tourMap[id] } : {};
+            };
+            
             return (
               <button
                 key={item.id}
@@ -58,6 +71,7 @@ const StudentSidebar: React.FC<StudentSidebarProps> = ({ activeTab, setActiveTab
                     ? 'bg-purple-100/80 dark:bg-purple-900/60 text-purple-700 dark:text-purple-200 border border-purple-200 dark:border-purple-800'
                     : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
                 )}
+                {...getTourAttribute(item.id)}
               >
                 <Icon className="h-5 w-5" />
                 <span>{item.name}</span>

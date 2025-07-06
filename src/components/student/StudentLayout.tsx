@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Menu, X } from 'lucide-react';
 import { ThemeToggle } from '@/components/theme-toggle';
+import { TourControl } from './TourControl';
 import { cn } from '@/lib/utils';
 import StudentSidebar from './StudentSidebar';
 
@@ -51,6 +52,7 @@ export function StudentLayout({ children, currentPage, onPageChange, sidebarOpen
             </Button>
             <div className="flex-1"></div>
             <div className="flex items-center gap-4">
+              <TourControl variant="icon" />
               <ThemeToggle />
             </div>
           </div>

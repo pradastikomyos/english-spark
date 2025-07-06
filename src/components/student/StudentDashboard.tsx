@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/hooks/useAuth';
+import { useStudentTour } from '@/hooks/useStudentTour';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -50,6 +51,7 @@ interface StudentDashboardProps {
 export function StudentDashboard({ onStartQuiz, onReviewQuiz }: StudentDashboardProps) {
   const { user, profileId } = useAuth();
   const { toast } = useToast();
+  const { initializeTour } = useStudentTour();
   const [stats, setStats] = useState<DashboardStats>({
     studentData: null,
     recentQuizzes: [],
@@ -104,6 +106,13 @@ export function StudentDashboard({ onStartQuiz, onReviewQuiz }: StudentDashboard
       };
     }
   }, [profileId]);
+
+  // Initialize tour after dashboard data is loaded
+  useEffect(() => {
+    if (!loading && stats.studentData) {
+      initializeTour();
+    }
+  }, [loading, stats.studentData, initializeTour]);
 
   const fetchDashboardData = async () => {
     try {
@@ -301,39 +310,47 @@ export function StudentDashboard({ onStartQuiz, onReviewQuiz }: StudentDashboard
 
       {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6 max-w-7xl mx-auto">
-        <StatCard
-          title="Total Points"
-          value={studentData?.total_points || 0}
-          icon={Star}
-          description="Points earned across all quizzes"
-          color="text-yellow-600"
-        />
-        <StatCard
-          title="Current Level"
-          value={`Level ${studentData?.level || 1}`}
-          icon={Award}
-          description={`Progress to Level ${(studentData?.level || 1) + 1}`}
-          color="text-purple-600"
-        />
-        <StatCard
-          title="Streak Days"
-          value={studentData?.current_streak || 0}
-          icon={Flame}
-          description="Consecutive days of learning"
-          color="text-orange-600"
-        />
-        <StatCard
-          title="Class Rank"
-          value={stats.classRank > 0 ? `#${stats.classRank} of ${stats.totalClassmates}` : 'N/A'}
-          icon={Hash}
-          description={studentData?.classes?.name ? `In ${studentData.classes.name}` : 'Not in a class'}
-          color="text-blue-600"
-        />
+        <div data-tour="total-points">
+          <StatCard
+            title="Total Points"
+            value={studentData?.total_points || 0}
+            icon={Star}
+            description="Points earned across all quizzes"
+            color="text-yellow-600"
+          />
+        </div>
+        <div data-tour="current-level">
+          <StatCard
+            title="Current Level"
+            value={`Level ${studentData?.level || 1}`}
+            icon={Award}
+            description={`Progress to Level ${(studentData?.level || 1) + 1}`}
+            color="text-purple-600"
+          />
+        </div>
+        <div data-tour="streak-days">
+          <StatCard
+            title="Streak Days"
+            value={studentData?.current_streak || 0}
+            icon={Flame}
+            description="Consecutive days of learning"
+            color="text-orange-600"
+          />
+        </div>
+        <div data-tour="class-rank">
+          <StatCard
+            title="Class Rank"
+            value={stats.classRank > 0 ? `#${stats.classRank} of ${stats.totalClassmates}` : 'N/A'}
+            icon={Hash}
+            description={studentData?.classes?.name ? `In ${studentData.classes.name}` : 'Not in a class'}
+            color="text-blue-600"
+          />
+        </div>
       </div>
 
       {/* Level & Progress Section (Optional, can be removed if stats cards are sufficient) */}
       {/* Keeping it for now as it provides a visual progress bar */}
-      <Card className="bg-gradient-to-r from-blue-500 to-green-500 text-white">
+      <Card className="bg-gradient-to-r from-blue-500 to-green-500 text-white" data-tour="level-progress">
         <CardContent className="p-6">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
@@ -376,7 +393,7 @@ export function StudentDashboard({ onStartQuiz, onReviewQuiz }: StudentDashboard
         {/* Quick Actions */}
         <div className="lg:col-span-2 space-y-6">
           {/* Assigned Quizzes */}
-          <Card>
+          <Card data-tour="assigned-quizzes">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <ClipboardList className="h-5 w-5 text-purple-600" />
