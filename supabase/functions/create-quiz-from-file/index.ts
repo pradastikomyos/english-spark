@@ -279,7 +279,8 @@ serve(async (req) => {
           title,
           description,
           total_questions: questionsToInsert.length,
-          created_by: teacherId, // CRITICAL FIX: Use the teacher's ID
+          created_by: teacherId, // Use the teacher's ID from teachers table
+          teacher_id: user.id, // Use auth.uid() for RLS
           total_points: questionsToInsert.reduce((sum: number, q: any) => sum + q.points, 0), // Calculate total points
         })
         .select('id, created_at, total_points')

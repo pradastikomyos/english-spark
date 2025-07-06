@@ -171,15 +171,26 @@ export default function QuizManagement() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user?.id) throw new Error('User not authenticated');
 
-      // Create quiz directly with teacher_id as auth.uid()
+      // Get teacher ID from teachers table
+      const { data: teacherData, error: teacherError } = await supabase
+        .from('teachers')
+        .select('id')
+        .eq('user_id', user.id)
+        .single();
+
+      if (teacherError || !teacherData) {
+        throw new Error('Teacher profile not found. Please contact administrator.');
+      }
+
+      // Create quiz with proper teacher references
       const { data, error } = await supabase
         .from('quizzes')
         .insert({
           title,
           description,
           time_limit,
-          teacher_id: user.id, // Use auth.uid() as teacher_id
-          created_by: user.id, // For backward compatibility
+          teacher_id: user.id, // Use auth.uid() as teacher_id (for RLS)
+          created_by: teacherData.id, // Use teachers.id for foreign key
           status: 'open'
         })
         .select()

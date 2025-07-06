@@ -314,27 +314,6 @@ export const useStudentTour = () => {
               inline: 'center'
             });
           }
-
-          // Custom button reordering logic
-          const buttonArea = document.querySelector('.introjs-tooltipbuttons');
-          if (buttonArea) {
-            const prevBtn = buttonArea.querySelector('.introjs-prevbutton');
-            const nextBtn = buttonArea.querySelector('.introjs-nextbutton');
-            const doneBtn = buttonArea.querySelector('.introjs-donebutton');
-
-            // Ensure the right-side container exists
-            if (!buttonArea.querySelector('.introjs-buttons-right')) {
-              const rightContainer = document.createElement('div');
-              rightContainer.className = 'introjs-buttons-right';
-              
-              // Move buttons into the right container
-              if (prevBtn) rightContainer.appendChild(prevBtn);
-              if (nextBtn) rightContainer.appendChild(nextBtn);
-              if (doneBtn) rightContainer.appendChild(doneBtn);
-
-              buttonArea.appendChild(rightContainer);
-            }
-          }
           return true; // Allow the step to proceed
         });
 
