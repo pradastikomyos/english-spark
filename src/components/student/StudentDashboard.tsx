@@ -136,16 +136,32 @@ export function StudentDashboard({ onStartQuiz, onReviewQuiz }: StudentDashboard
         .order('completed_at', { ascending: false })
         .limit(5);
 
-      // Fetch available quizzes
+      // Fetch available quizzes (only open quizzes that haven't been completed)
       const { data: availableQuizzes } = await supabase
         .from('class_quizzes')
         .select(`
           *,
-          quizzes:quiz_id(*)
+          quizzes:quiz_id!inner(*)
         `)
         .eq('class_id', studentData?.class_id)
-        .order('assigned_at', { ascending: false })
-        .limit(3);
+        .eq('quizzes.status', 'open')
+        .order('assigned_at', { ascending: false });
+
+      // Filter out completed quizzes from available quizzes
+      let filteredAvailableQuizzes = [];
+      if (availableQuizzes) {
+        const availableQuizIds = availableQuizzes.map(q => q.quiz_id);
+        const { data: completedAvailableQuizzes } = await supabase
+          .from('quiz_attempts')
+          .select('quiz_id')
+          .eq('student_id', profileId)
+          .in('quiz_id', availableQuizIds);
+
+        const completedAvailableQuizIds = completedAvailableQuizzes?.map(c => c.quiz_id) || [];
+        filteredAvailableQuizzes = availableQuizzes
+          .filter(quiz => !completedAvailableQuizIds.includes(quiz.quiz_id))
+          .slice(0, 3); // Limit to 3 after filtering
+      }
 
       // Fetch assigned quizzes with completion status
       const assignedQuizzesQuery = await supabase
@@ -207,7 +223,7 @@ export function StudentDashboard({ onStartQuiz, onReviewQuiz }: StudentDashboard
           studentData,
           recentQuizzes: recentQuizzes || [],
           achievements: achievements || [],
-          availableQuizzes: availableQuizzes || [],
+          availableQuizzes: filteredAvailableQuizzes || [],
           assignedQuizzes: enrichedAssignedQuizzes || [],
           classRank: rank,
           totalClassmates: classmates?.length || 0,
@@ -217,7 +233,7 @@ export function StudentDashboard({ onStartQuiz, onReviewQuiz }: StudentDashboard
           studentData,
           recentQuizzes: recentQuizzes || [],
           achievements: achievements || [],
-          availableQuizzes: availableQuizzes || [],
+          availableQuizzes: filteredAvailableQuizzes || [],
           assignedQuizzes: [],
           classRank: 0,
           totalClassmates: 0,
