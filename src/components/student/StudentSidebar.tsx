@@ -8,7 +8,8 @@ import {
   User, 
   LogOut,
   BookOpen,
-  Trophy
+  Trophy,
+  Wallet
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -27,6 +28,7 @@ const StudentSidebar: React.FC<StudentSidebarProps> = ({ activeTab, setActiveTab
     { name: 'Leaderboard', id: 'leaderboard', icon: Trophy },
     { name: 'Study Materials', id: 'materials', icon: BookOpen },
     { name: 'Achievements', id: 'achievements', icon: Award },
+    { name: 'Rewards', id: 'rewards', icon: Wallet },
     { name: 'Profile', id: 'profile', icon: User },
   ];
 

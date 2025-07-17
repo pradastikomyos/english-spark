@@ -8,6 +8,7 @@ import { Leaderboard } from '@/components/student/Leaderboard';
 import { StudyMaterials } from '@/components/student/StudyMaterials';
 import { MaterialViewer } from '@/components/student/MaterialViewer';
 import { Achievements } from '@/components/student/Achievements';
+import { Rewards } from '@/components/student/Rewards';
 import Profile from '@/components/student/Profile';
 import { FirstTimeWelcome } from '@/components/student/FirstTimeWelcome';
 import { useToast } from '@/hooks/use-toast';
@@ -147,6 +148,11 @@ export default function StudentPortal() {
         return <StudyMaterials onStartMaterial={handleStartMaterial} />;
       case 'achievements':
         return <Achievements />;
+      case 'rewards':
+        return <Rewards 
+          onNavigateToLeaderboard={() => setCurrentPage('leaderboard')}
+          onNavigateToAchievements={() => setCurrentPage('achievements')}
+        />;
       case 'profile':
         return <Profile onNavigateToDashboard={() => setCurrentPage('dashboard')} />;
       default:

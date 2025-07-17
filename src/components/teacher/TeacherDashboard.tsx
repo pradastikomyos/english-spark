@@ -3,8 +3,10 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { supabase } from '@/lib/supabase';
-import { Users, FileText, TrendingUp, Award, BookOpen, Clock } from 'lucide-react';
+import { Users, FileText, TrendingUp, Award, BookOpen, Clock, Monitor } from 'lucide-react';
+import { ProjectorDisplay } from './ProjectorDisplay';
 
 interface DashboardStats {
   totalStudents: number;
@@ -24,6 +26,7 @@ export function TeacherDashboard() {
     topPerformers: [],
   });
   const [loading, setLoading] = useState(true);
+  const [showProjector, setShowProjector] = useState(false);
 
   useEffect(() => {
     if (profileId) {
@@ -140,11 +143,25 @@ export function TeacherDashboard() {
     );
   }
 
+  if (showProjector) {
+    return <ProjectorDisplay onClose={() => setShowProjector(false)} />;
+  }
+
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
-        <p className="text-gray-600">Welcome back! Here's an overview of your teaching activities.</p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
+          <p className="text-gray-600">Welcome back! Here's an overview of your teaching activities.</p>
+        </div>
+        <Button
+          onClick={() => setShowProjector(true)}
+          className="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-6 py-3"
+          size="lg"
+        >
+          <Monitor className="h-5 w-5 mr-2" />
+          Launch Projector Display
+        </Button>
       </div>
 
       {/* Stats Cards */}
